@@ -134,7 +134,7 @@ Self-hosted n8n Community edition in Docker on your own machine. Workflows were 
    - OAuth consent screen: External, publishing status **Testing**, add the demo account as a **test user**.
    - Create an OAuth client of type **Web application**. As the authorized redirect URI, paste the **OAuth Redirect URL** that n8n shows in the credential dialog of the next step.
 
-3. **Create the 4 credentials in n8n** (Overview, Credentials, Create). Use exactly these names, the workflows look them up by name:
+3. **Create the 4 credentials in n8n** (Overview, Credentials, Create). Use these names. The workflow files name the credential each node expects, but n8n does not reliably link them by name on import, so step 6 checks every node:
 
    | Name | Type | What to enter |
    |---|---|---|
@@ -150,10 +150,14 @@ Self-hosted n8n Community edition in Docker on your own machine. Workflows were 
 5. **Import both workflows:** in n8n, create a workflow, open the `...` menu, choose **Import from File** and pick `n8n/error-handler.workflow.json`. Save. Do the same in a second workflow for `n8n/lead-inbox.workflow.json`.
 
 6. **Finish the nodes in the editor:**
+   - **Check the credentials first.** On import, n8n can link a node to the first credential of the right type instead of the one with the matching name. In the first live test, both Gemini nodes got `Webhook secret`, because it is also a Header Auth credential. Open each of these nodes and pick the credential by hand:
+     - `Gemini classify` and `Gemini repair`: **Gemini API key**.
+     - `Webhook`: **Webhook secret**.
+     - Every Google Sheets node (`Find in Leads`, `Add Dead Letter row`, `Add Leads row`, `Add Run Log row`, and `Add Dead Letter row` in the error handler): **Demo Sheets**. These link only when the credential name matches exactly, so check each one.
+     - The Gmail nodes (trigger, draft, alert, the four labels, and `Send error alert` in the error handler): **Demo Gmail**.
    - Every Google Sheets node (4 in the main workflow, 1 in the error handler): pick your spreadsheet in **Document**. The tab is already set by name.
    - Nodes `Label HOT`, `Label COLD`, `Label SUPPORT`, `Label JUNK`: pick the matching label.
    - Node `Config`: check `gemini_model` against the current Flash-Lite model id in Google AI Studio (the default `gemini-3.1-flash-lite` is listed with a free tier on the Gemini API pricing page as of 2026-11-01), and set `alert_to` to the demo inbox's own address (placeholder `demo-inbox@example.com`). Hot lead alerts go only to this address.
-   - If a node shows a credential warning, open it and pick the credential with the matching name.
 
 7. **Set the error workflow:** in the main workflow, open **Settings** and set **Error workflow** to `Lead Inbox error handler (demo)`. Save.
 
