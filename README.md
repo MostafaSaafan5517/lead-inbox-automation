@@ -111,6 +111,12 @@ node scripts/send-test-leads.mjs --dry-run # shows the 16 test requests, no netw
 
 To send the test requests to a real webhook, copy `.env.example` to `.env`, fill in `WEBHOOK_URL` and `WEBHOOK_SECRET`, then run `node --env-file=.env scripts/send-test-leads.mjs`. The script never prints either value. It sends the 12 demo messages, then four bad cases (wrong secret, missing body and subject, oversize body, invalid JSON), and prints a table of expected and actual results.
 
+The script waits 6 seconds between requests. Change it with `--delay-ms`, for example `node --env-file=.env scripts/send-test-leads.mjs --delay-ms 10000`.
+
+### Google Sheets quota
+
+Google Sheets allows **60 read requests per minute per user** (the limit named in the `429` error from the first live test). Every message costs several reads: the duplicate check reads the Leads tab, and each append-or-update reads the tab again to find the key before it writes. In the n8n 2.45.7 Google Sheets node, each of those calls makes about two read requests (sheet details, then the sheet data), so one lead costs about 6 reads (counted from the node source, not measured). At the default 6-second spacing that is about 60 reads a minute, right at the limit. A short `429` is retried and the retry is now safe, but if you see many, raise `--delay-ms` (8000 to 10000).
+
 ## Setup: n8n
 
 Self-hosted n8n Community edition in Docker on your own machine. Workflows were checked by importing them into `n8nio/n8n:2.45.7`.

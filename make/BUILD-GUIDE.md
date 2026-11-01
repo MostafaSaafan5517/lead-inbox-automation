@@ -382,7 +382,7 @@ Difference from n8n: n8n writes a Dead Letter row when a Gemini call still fails
 ## Part 4: Test Scenario B
 
 1. Fill your local `.env` (git-ignored): `WEBHOOK_URL` = the module 1 webhook URL, `WEBHOOK_SECRET` = your secret.
-2. Run `node --env-file=.env scripts/send-test-leads.mjs`. It sends the 12 demo messages and four bad cases, five seconds apart.
+2. Run `node --env-file=.env scripts/send-test-leads.mjs`. It sends the 12 demo messages and four bad cases, six seconds apart (change it with `--delay-ms`, see "Google Sheets quota" in the main README).
 3. Expected: valid messages get `202`, the message without subject and body gets `400`, a wrong secret gets `403`. The invalid JSON case should be rejected by Make before the scenario runs; the exact status code Make returns is NOT VERIFIED (n8n returns `422`). The script only checks accepted versus rejected.
 4. Check the Leads, Dead Letter and Run Log tabs, Gmail Drafts and the alert emails.
 

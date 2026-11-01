@@ -2,14 +2,21 @@
 // Usage:
 //   node scripts/send-test-leads.mjs --dry-run   (prints what would be sent, no network)
 //   node --env-file=.env scripts/send-test-leads.mjs   (WEBHOOK_URL and WEBHOOK_SECRET in .env)
+//   --delay-ms <n>   wait n ms between requests (default 6000, keeps Gemini and Sheets under their rate limits)
 // The URL and secret are read from the environment only and are never printed.
 import { readFileSync } from "node:fs";
 
-const DELAY_MS = 5000; // spacing between requests so the Gemini free tier rate limit is not hit
+const DEFAULT_DELAY_MS = 6000;
 const TIMEOUT_MS = 30000;
 const OVERSIZE_LENGTH = 20000;
 
 const dryRun = process.argv.includes("--dry-run");
+const delayFlagIndex = process.argv.indexOf("--delay-ms");
+const delayMs = delayFlagIndex === -1 ? DEFAULT_DELAY_MS : Number(process.argv[delayFlagIndex + 1]);
+if (!Number.isInteger(delayMs) || delayMs < 0) {
+  process.stderr.write("--delay-ms needs a whole number of milliseconds, for example --delay-ms 6000.\n");
+  process.exit(1);
+}
 const webhookUrl = process.env.WEBHOOK_URL;
 const webhookSecret = process.env.WEBHOOK_SECRET;
 
@@ -95,7 +102,8 @@ async function send(testCase) {
 if (dryRun) {
   process.stdout.write(
     `Dry run: ${cases.length} requests, POST to WEBHOOK_URL (${webhookUrl ? "set" : "not set"}), ` +
-      `X-Webhook-Secret from WEBHOOK_SECRET (${webhookSecret ? "set" : "not set"}). No network calls.\n\n`,
+      `X-Webhook-Secret from WEBHOOK_SECRET (${webhookSecret ? "set" : "not set"}), ` +
+      `${delayMs} ms between requests. No network calls.\n\n`,
   );
   printTable(
     cases.map((testCase) => ({
@@ -114,7 +122,7 @@ if (dryRun) {
 
   const rows = [];
   for (const [index, testCase] of cases.entries()) {
-    if (index > 0) await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
+    if (index > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
     const { status, got } = await send(testCase);
     rows.push({ case: testCase.name, expect: testCase.expect, status, got, match: got === testCase.expect ? "yes" : "NO" });
   }
