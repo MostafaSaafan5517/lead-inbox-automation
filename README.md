@@ -128,7 +128,7 @@ Self-hosted n8n Community edition in Docker on your own machine. Workflows were 
 6. **Finish the nodes in the editor:**
    - Every Google Sheets node (4 in the main workflow, 1 in the error handler): pick your spreadsheet in **Document**. The tab is already set by name.
    - Nodes `Label HOT`, `Label COLD`, `Label SUPPORT`, `Label SPAM`: pick the matching label.
-   - Node `Config`: check `gemini_model` against the current Flash-Lite model id in Google AI Studio (the default `gemini-2.5-flash-lite` is not verified), and set `alert_to` to the demo inbox's own address (placeholder `demo-inbox@example.com`). Hot lead alerts go only to this address.
+   - Node `Config`: check `gemini_model` against the current Flash-Lite model id in Google AI Studio (the default `gemini-3.1-flash-lite` is listed with a free tier on the Gemini API pricing page as of 2026-11-01), and set `alert_to` to the demo inbox's own address (placeholder `demo-inbox@example.com`). Hot lead alerts go only to this address.
    - If a node shows a credential warning, open it and pick the credential with the matching name.
 
 7. **Set the error workflow:** in the main workflow, open **Settings** and set **Error workflow** to `Lead Inbox error handler (demo)`. Save.
