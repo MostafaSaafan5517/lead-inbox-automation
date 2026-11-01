@@ -115,7 +115,7 @@ The script waits 6 seconds between requests. Change it with `--delay-ms`, for ex
 
 ### Google Sheets quota
 
-Google Sheets allows **60 read requests per minute per user** (the limit named in the `429` error from the first live test). Every message costs several reads: the duplicate check reads the Leads tab, and each append-or-update reads the tab again to find the key before it writes. In the n8n 2.45.7 Google Sheets node, each of those calls makes about two read requests (sheet details, then the sheet data), so one lead costs about 6 reads (counted from the node source, not measured). At the default 6-second spacing that is about 60 reads a minute, right at the limit. A short `429` is retried and the retry is now safe, but if you see many, raise `--delay-ms` (8000 to 10000).
+Google Sheets allows **60 read requests per minute per user** (the limit named in the `429` error from the first live test). Every message costs several reads: the duplicate check reads the Leads tab, and each append-or-update reads the tab again to find the key before it writes. In the n8n 2.45.7 Google Sheets node, each of those calls makes about two read requests (sheet details, then the sheet data), so one lead costs about 6 reads (counted from the node source, not measured). At the default 8-second spacing that is about 45 reads a minute. In the live test at 6-second spacing a few `429` errors still happened; the retries handled them without duplicate rows. If you see many, raise `--delay-ms` (for example 10000).
 
 ## Setup: n8n
 
@@ -176,6 +176,7 @@ Self-hosted n8n Community edition in Docker on your own machine. Workflows were 
 
 Notes:
 
+- A brand-new Gmail account may put the first test emails in **Spam**. The trigger does not read Spam, so mark them "Not spam" (in the live test the trigger then picked them up on its next poll).
 - The Gmail Trigger **polls** every minute, so no public URL is needed for email. It skips mail sent by the demo inbox itself (the alerts) and mail that already has one of the four labels.
 - The test script runs on the same machine, so it needs **no tunnel**. A tunnel (for example `cloudflared` or `ngrok`) is only needed if the web form is called from outside the laptop.
 - Drafts are never sent. The only email the flow sends is the alert, and it goes to the demo inbox.
