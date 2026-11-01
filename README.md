@@ -194,7 +194,7 @@ Saving credits: keep **Email intake off** outside tests and demos. A polling sce
 | Workflows | One workflow with two triggers, plus an error workflow | Two scenarios (Free plan limit of 2 active scenarios, NOT VERIFIED on make.com) |
 | Email trigger | Gmail Trigger polls every minute | Gmail Watch emails, 15-minute minimum (NOT VERIFIED on make.com), off outside demos |
 | Cleanup logic | `src/cleanup.js` pasted into Code nodes, unit tested, `npm test` catches drift | Built-in functions and filters in the scenario, same rules but weaker in places (build guide, Part 7) |
-| Error handling | Retry On Fail (3 tries, 5 s apart); Sheets writes are append-or-update on a key, so a retry never adds a second row; a call that still fails becomes a Dead Letter row | Retry error handler (3 attempts, 5 minutes apart); a call that still fails stays in Incomplete executions, data failures become Dead Letter rows |
+| Error handling | Retry On Fail (3 tries, 5 s apart); Sheets writes are append-or-update on a key, so a retry never adds a second row; a call that still fails becomes a Dead Letter row | Retry error handler (3 attempts, 5 minutes apart); a call that still fails stays in Incomplete executions, data failures become Dead Letter rows; Dead Letter and Run Log rows are added only when their key is not in the tab yet |
 | Status | Imported and checked in a local n8n | Blueprints are drafts, NOT VERIFIED until imported in Make |
 
 ## Cost

@@ -92,3 +92,35 @@ test("README, make/README and the build guide reference both blueprints", () => 
     for (const file of FILES) assert.ok(text.includes(file), `${doc} does not mention ${file}`);
   }
 });
+
+test("process-lead: Dead Letter and Run Log rows are added only when their key is not in the tab yet", () => {
+  const deadLetterColumns = read("test-data/sheet-headers/dead-letter.csv").trim().split(",");
+  const flows = [];
+  (function collect(flow) {
+    flows.push(flow);
+    for (const module of flow ?? []) {
+      for (const route of module.routes ?? []) collect(route.flow);
+      if (module.onerror) collect(module.onerror);
+    }
+  })(blueprints["process-lead.blueprint.json"].flow);
+
+  const writes = flows.flatMap((flow) =>
+    flow.map((module, index) => ({ module, before: flow[index - 1] })).filter(({ module }) => module.module === "google-sheets:addRow"),
+  );
+  const checked = writes.filter(({ module }) => ["Dead Letter", "Run Log"].includes(module.mapper.sheetId));
+  assert.equal(checked.length, 4);
+  for (const { module, before } of checked) {
+    const keyColumn = module.mapper.sheetId === "Dead Letter" ? "H" : "D";
+    assert.equal(before.module, "google-sheets:makeApiCall", `module ${module.id} has no read before it`);
+    assert.match(before.mapper.url, new RegExp(`!${keyColumn}:${keyColumn}$`), `module ${before.id} reads the wrong column`);
+    const [condition] = module.filter.conditions.flat();
+    assert.deepEqual([condition.a, condition.o], [`{{flatten(${before.id}.body.values)}}`, "array:notcontain"], `module ${module.id}`);
+    if (module.mapper.sheetId === "Dead Letter") {
+      assert.equal(Object.keys(module.mapper.values).length, deadLetterColumns.length, `module ${module.id} column count`);
+      assert.equal(module.mapper.values[String(deadLetterColumns.indexOf("dead_letter_key"))], condition.b, `module ${module.id} key`);
+      assert.match(condition.b, /:[a-z ]+$/, `module ${module.id} key has no stage`);
+    } else {
+      assert.equal(condition.b, module.mapper.values[String(read("test-data/sheet-headers/run-log.csv").split(",").indexOf("message_id"))]);
+    }
+  }
+});

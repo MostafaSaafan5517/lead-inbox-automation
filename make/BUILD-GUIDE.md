@@ -32,7 +32,7 @@ You need (all from the build plan's manual steps):
 
 1. The demo Gmail account, signed in in your browser.
 2. A Make.com Free account. Sign in.
-3. The Google Sheet with three tabs, `Leads`, `Dead Letter` and `Run Log`, with the header rows from `test-data/sheet-headers/`. The Leads tab must keep `message_id` in **column E**, because the duplicate check reads that column.
+3. The Google Sheet with three tabs, `Leads`, `Dead Letter` and `Run Log`, with the header rows from `test-data/sheet-headers/`. Keep the column order of those files: the duplicate and "write once" checks read fixed columns, `message_id` in **column E** of Leads and **column D** of Run Log, and `dead_letter_key` in **column H** of Dead Letter.
 4. The Gmail labels `HOT`, `COLD`, `SUPPORT` and `JUNK` in the demo inbox.
 5. A Gemini API key from Google AI Studio, signed in as the demo account, no billing. Keep it in your password manager. You paste it into Make once, in step 2.3.
 6. A long random webhook secret (for example 40 random letters and digits). Keep it in your password manager and in your local `.env` as `WEBHOOK_SECRET`. Never commit it.
@@ -134,7 +134,8 @@ Open **Data structures** in the left menu and create three. For each, click **Ad
 3. Filter on the link to module 6, label `Invalid input`:
    - Group 1: `{{4.subject}}` **Basic operators: Does not exist**, AND `{{4.body}}` **Does not exist**
    - OR group 2: `{{4.message_id}}` **Does not exist**
-4. After module 6, module 7: **Google Sheets**, **Add a row**. Create the `Demo Sheets` connection here. Search method: select from the list, pick your spreadsheet, sheet `Dead Letter`, **Table contains headers** Yes. Map the columns:
+4. After module 6, module 34 ("Read Dead Letter keys"): **Google Sheets**, **Make an API call**. Create the `Demo Sheets` connection here. URL `/v4/spreadsheets/{{4.spreadsheet_id}}/values/%27Dead%20Letter%27!H:H` (the tab name in quotes, URL-encoded; NOT VERIFIED whether Make also accepts it unencoded), method `GET`, Retry error handler. See "Write each row once" below.
+5. After module 34, module 7: **Google Sheets**, **Add a row**. Search method: select from the list, pick your spreadsheet, sheet `Dead Letter`, **Table contains headers** Yes. Filter on the link from module 34, label `Not written yet`: `{{flatten(34.body.values)}}` **Array operators: Does not contain** `{{ifempty(4.message_id; "no-id-" + timestamp)}}:normalize`. Map the columns:
 
    | Column | Value |
    |---|---|
@@ -145,8 +146,9 @@ Open **Data structures** in the left menu and create three. For each, click **Ad
    | stage | `normalize` |
    | error | same `if(...)` formula as the 400 body |
    | raw_payload | `from={{1.from_email}} subject={{substring(1.subject; 0; 400)}}` |
+   | dead_letter_key | `{{ifempty(4.message_id; "no-id-" + timestamp)}}:normalize` (the same text as in the filter) |
 
-5. Add the **Retry** error handler to module 7 (see "Retry handler settings" below).
+6. Add the **Retry** error handler to module 7 (see "Retry handler settings" below).
 
 ### 3.5 Module 8: Webhook response 202
 
@@ -247,14 +249,14 @@ The two routes of a router run one after the other, in order. Route 1 runs the r
    ```
 
    If there was a repair, this parses the repaired answer; otherwise the first answer again.
-3. Error handler on module 18 (repaired answer is not JSON): right-click, **Add error handler**, first add **Google Sheets**, **Add a row** to `Dead Letter` (module 19 or the next free number) with: time (the `formatDate(now; ...)` formula), tool `make`, source `{{4.source}}`, message_id `{{4.message_id}}`, stage `repair parse`, error `Repaired answer is not valid JSON`, raw_payload `{{substring(17.value; 0; 500)}}`. Then end the handler route with **Ignore**.
+3. Error handler on module 18 (repaired answer is not JSON): right-click, **Add error handler**. First add module 35, a "Read Dead Letter keys" API call exactly like module 34. Then **Google Sheets**, **Add a row** to `Dead Letter` (module 1800 in the draft) with: time (the `formatDate(now; ...)` formula), tool `make`, source `{{4.source}}`, message_id `{{4.message_id}}`, stage `repair parse`, error `Repaired answer is not valid JSON`, raw_payload `{{substring(17.value; 0; 500)}}`, dead_letter_key `{{4.message_id}}:repair parse`. Filter on the link from module 35, label `Not written yet`: `{{flatten(35.body.values)}}` **Array operators: Does not contain** `{{4.message_id}}:repair parse`. Then end the handler route with **Ignore**. Modules inside an error handler route get no Retry handler of their own.
 
 ### 3.12 Router ("Final answer valid?"): module 22 (Dead Letter) and module 23 ("Clean lead")
 
 1. Add a **Router** after module 18 (number 21 in the draft; the number does not matter for routers).
-2. Route 1, module 22: **Google Sheets**, **Add a row** to `Dead Letter`: time, tool `make`, source `{{4.source}}`, message_id `{{4.message_id}}`, stage `repair validate`, error `Invalid category or missing reply_draft after one repair`, raw_payload `{{substring(ifempty(17.value; 11.data.candidates[1].content.parts[1].text); 0; 500)}}`. Retry error handler.
+2. Route 1, module 36: a "Read Dead Letter keys" API call exactly like module 34, with the Retry error handler. Filter on the link from the router to module 36, label `Final answer invalid`: the same two groups as `First answer invalid`, with `18.` instead of `12.`.
 
-   Filter label `Final answer invalid`: the same two groups as `First answer invalid`, with `18.` instead of `12.`.
+   Then module 22: **Google Sheets**, **Add a row** to `Dead Letter`: time, tool `make`, source `{{4.source}}`, message_id `{{4.message_id}}`, stage `repair validate`, error `Invalid category or missing reply_draft after one repair`, raw_payload `{{substring(ifempty(17.value; 11.data.candidates[1].content.parts[1].text); 0; 500)}}`, dead_letter_key `{{4.message_id}}:repair validate`. Filter on the link from module 36, label `Not written yet`: `{{flatten(36.body.values)}}` **Array operators: Does not contain** `{{4.message_id}}:repair validate`. Retry error handler.
 3. Route 2, module 23: **Tools**, **Set multiple variables**, lifetime **One cycle**. Filter label `Final answer valid`:
    - Group 1: category formula (with `18.`) **Matches pattern** `^(hot_lead|cold_lead|support|spam)$` AND category formula **Equal to** `spam`
    - OR group 2: category formula **Matches pattern** `^(hot_lead|cold_lead|support|spam)$` AND `{{18.reply_draft}}` **Exists**
@@ -273,7 +275,7 @@ The two routes of a router run one after the other, in order. Route 1 runs the r
    | `reply_draft` | `{{if(replace(trim(replace(lower(18.category); /[^a-z]+/g; space)); space; "_") = "spam"; emptystring; trim(18.reply_draft))}}` |
    | `reason` | `{{ifempty(trim(18.reason); "No reason given")}}` |
 
-### 3.13 Router ("Route by category"): modules 25 to 32
+### 3.13 Router ("Route by category"): modules 25 to 33
 
 Add a **Router** after module 23 (number 24) with **seven routes**, in this order (routes run top to bottom):
 
@@ -326,7 +328,7 @@ Add a **Router** after module 23 (number 24) with **seven routes**, in this orde
    | 6 | `Email and spam` | ... `spam` | JUNK |
 
    Web form messages have no Gmail message, so they skip all four.
-7. **Run Log.** No filter. Module 32: **Google Sheets**, **Add a row** to `Run Log` (Retry error handler): time (the `formatDate(now; ...)` formula), tool `make`, source `{{4.source}}`, message_id `{{4.message_id}}`, category `{{23.category}}`, note `{{23.reason}}`, outcome:
+7. **Run Log.** No filter on the route. Module 33 ("Read Run Log message ids"): **Google Sheets**, **Make an API call**, URL `/v4/spreadsheets/{{4.spreadsheet_id}}/values/%27Run%20Log%27!D:D`, method `GET`, Retry error handler. Then module 32: **Google Sheets**, **Add a row** to `Run Log` (Retry error handler), with a filter on the link from module 33, label `Not logged yet`: `{{flatten(33.body.values)}}` **Array operators: Does not contain** `{{4.message_id}}`. Map: time (the `formatDate(now; ...)` formula), tool `make`, source `{{4.source}}`, message_id `{{4.message_id}}`, category `{{23.category}}`, note `{{23.reason}}`, outcome:
 
    ```text
    {{switch(23.category; "hot_lead"; "Leads row, draft, HOT label, alert"; "cold_lead"; "Leads row, draft, COLD label"; "support"; "Leads row, draft, SUPPORT label"; "JUNK label only")}}
@@ -334,9 +336,23 @@ Add a **Router** after module 23 (number 24) with **seven routes**, in this orde
 
 Spam therefore gets only the JUNK label (email only) and a Run Log row, with no draft and no Leads row, like the n8n version.
 
+### Write each row once
+
+A Google Sheets **Add a row** is not idempotent: if it runs twice for the same message, the tab gets two rows. The n8n version uses the Sheets node's Append or Update Row operation for this. Make has no single append-or-update module for Google Sheets (NOT VERIFIED, none found in the module list), so Scenario B does "search, then add only if missing":
+
+| Tab | Read before the write | Key |
+|---|---|---|
+| Leads | module 9 (the duplicate check at the start) | `message_id` |
+| Run Log | module 33 | `message_id` |
+| Dead Letter | modules 34, 35, 36 | `dead_letter_key` = message id + `:` + stage |
+
+This keeps a second run for the same message (a re-sent spam message, a replayed request, a run started again from Incomplete executions) from adding a second row. The first row wins; unlike n8n, it is not updated. The array filter needs the whole cell to match, so a key never matches part of another key (NOT VERIFIED in Make).
+
+Limit: Make's Retry handler repeats the failed module, not the read before it (NOT VERIFIED in detail). So if an **Add a row** call writes the row and still reports an error (for example a timeout after Google saved it), its retry can add a second row. NOT VERIFIED whether Make's Add a row can fail that way; it should send one request per row, so a `429` would mean nothing was written. Check the tabs after a run with errors.
+
 ### Retry handler settings
 
-Use these on every Gemini, Google Sheets and Gmail module listed above (modules 7, 9, 11, 15, 22, 25 to 32):
+Use these on every Gemini, Google Sheets and Gmail module listed above (modules 7, 9, 11, 15, 22, 25 to 34 and 36; module 35 sits inside an error handler route and gets none):
 
 1. Right-click the module, **Add error handler**, **Retry**.
 2. **Automatically complete execution**: Yes. Number of attempts: `3`. Interval: `5` minutes. (A Make community thread reports that very short intervals are scheduled later than set; NOT VERIFIED.)
@@ -420,21 +436,21 @@ All numbers below are an **estimate, NOT VERIFIED**. They assume Make charges 1 
 
 | Case | Scenario B | Scenario A | Total |
 |---|---|---|---|
-| Web form, hot lead, first answer valid | 14 | 0 | 14 |
-| Web form, cold lead or support | 13 | 0 | 13 |
-| Web form, spam | 11 | 0 | 11 |
-| Email, hot lead | 15 | 3 | 18 |
-| Email, spam | 12 | 3 | 15 |
+| Web form, hot lead, first answer valid | 15 | 0 | 15 |
+| Web form, cold lead or support | 14 | 0 | 14 |
+| Web form, spam | 12 | 0 | 12 |
+| Email, hot lead | 16 | 3 | 19 |
+| Email, spam | 13 | 3 | 16 |
 | Extra when a repair is needed | +3 | 0 | +3 |
 | Wrong secret | 2 | 0 | 2 |
-| No subject and no body | 4 | 0 | 4 |
+| No subject and no body | 5 | 0 | 5 |
 | Duplicate message | 4 | 0 | 4 |
 
-How Scenario B's 14 for a web form hot lead adds up: webhook 1, set variables 1, response 202 1, read message ids 1, create JSON 1, Gemini 1, parse 1, get variable 1, parse final 1, clean lead 1, draft 1, Leads row 1, alert 1, Run Log row 1.
+How Scenario B's 15 for a web form hot lead adds up: webhook 1, set variables 1, response 202 1, read message ids 1, create JSON 1, Gemini 1, parse 1, get variable 1, parse final 1, clean lead 1, draft 1, Leads row 1, alert 1, read Run Log ids 1, Run Log row 1.
 
 What that means on 1,000 credits a month:
 
-- One full run of `scripts/send-test-leads.mjs` (16 requests): about 160 to 200 credits.
+- One full run of `scripts/send-test-leads.mjs` (16 requests): about 170 to 210 credits.
 - Scenario A left on at a 15-minute interval: 4 checks an hour, about 2,900 checks a month, which alone is more than the 1,000 credits. That is why it stays off outside tests and demos.
 
 ## Part 7: Where Make's cleanup is weaker than the n8n Code node

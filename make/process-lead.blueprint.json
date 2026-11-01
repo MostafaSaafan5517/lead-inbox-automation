@@ -206,6 +206,46 @@
                       }
                     },
                     {
+                      "id": 34,
+                      "module": "google-sheets:makeApiCall",
+                      "version": 2,
+                      "parameters": {
+                        "__IMTCONN__": null
+                      },
+                      "mapper": {
+                        "url": "/v4/spreadsheets/{{4.spreadsheet_id}}/values/%27Dead%20Letter%27!H:H",
+                        "method": "GET",
+                        "headers": [],
+                        "qs": []
+                      },
+                      "metadata": {
+                        "designer": {
+                          "x": 2100,
+                          "y": 300,
+                          "name": "Read Dead Letter keys"
+                        }
+                      },
+                      "onerror": [
+                        {
+                          "id": 3400,
+                          "module": "builtin:Break",
+                          "version": 1,
+                          "parameters": {},
+                          "mapper": {
+                            "retry": true,
+                            "count": 3,
+                            "interval": 5
+                          },
+                          "metadata": {
+                            "designer": {
+                              "x": 0,
+                              "y": 0
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
                       "id": 7,
                       "module": "google-sheets:addRow",
                       "version": 2,
@@ -227,12 +267,13 @@
                           "3": "{{1.message_id}}",
                           "4": "normalize",
                           "5": "{{if(length(4.message_id) = 0; \"Email message has no message_id\"; \"Message has no subject and no body\")}}",
-                          "6": "from={{1.from_email}} subject={{substring(1.subject; 0; 400)}}"
+                          "6": "from={{1.from_email}} subject={{substring(1.subject; 0; 400)}}",
+                          "7": "{{ifempty(4.message_id; \"no-id-\" + timestamp)}}:normalize"
                         }
                       },
                       "metadata": {
                         "designer": {
-                          "x": 2100,
+                          "x": 2400,
                           "y": 300,
                           "name": "Dead Letter: bad input"
                         }
@@ -255,7 +296,19 @@
                             }
                           }
                         }
-                      ]
+                      ],
+                      "filter": {
+                        "name": "Not written yet",
+                        "conditions": [
+                          [
+                            {
+                              "a": "{{flatten(34.body.values)}}",
+                              "b": "{{ifempty(4.message_id; \"no-id-\" + timestamp)}}:normalize",
+                              "o": "array:notcontain"
+                            }
+                          ]
+                        ]
+                      }
                     }
                   ]
                 },
@@ -662,6 +715,27 @@
                               },
                               "onerror": [
                                 {
+                                  "id": 35,
+                                  "module": "google-sheets:makeApiCall",
+                                  "version": 2,
+                                  "parameters": {
+                                    "__IMTCONN__": null
+                                  },
+                                  "mapper": {
+                                    "url": "/v4/spreadsheets/{{4.spreadsheet_id}}/values/%27Dead%20Letter%27!H:H",
+                                    "method": "GET",
+                                    "headers": [],
+                                    "qs": []
+                                  },
+                                  "metadata": {
+                                    "designer": {
+                                      "x": 5700,
+                                      "y": 600,
+                                      "name": "Read Dead Letter keys"
+                                    }
+                                  }
+                                },
+                                {
                                   "id": 1800,
                                   "module": "google-sheets:addRow",
                                   "version": 2,
@@ -683,15 +757,28 @@
                                       "3": "{{4.message_id}}",
                                       "4": "repair parse",
                                       "5": "Repaired answer is not valid JSON",
-                                      "6": "{{substring(17.value; 0; 500)}}"
+                                      "6": "{{substring(17.value; 0; 500)}}",
+                                      "7": "{{4.message_id}}:repair parse"
                                     }
                                   },
                                   "metadata": {
                                     "designer": {
-                                      "x": 5700,
+                                      "x": 6000,
                                       "y": 600,
                                       "name": "Dead Letter: repair parse"
                                     }
+                                  },
+                                  "filter": {
+                                    "name": "Not written yet",
+                                    "conditions": [
+                                      [
+                                        {
+                                          "a": "{{flatten(35.body.values)}}",
+                                          "b": "{{4.message_id}}:repair parse",
+                                          "o": "array:notcontain"
+                                        }
+                                      ]
+                                    ]
                                   }
                                 },
                                 {
@@ -725,6 +812,69 @@
                                 {
                                   "flow": [
                                     {
+                                      "id": 36,
+                                      "module": "google-sheets:makeApiCall",
+                                      "version": 2,
+                                      "parameters": {
+                                        "__IMTCONN__": null
+                                      },
+                                      "mapper": {
+                                        "url": "/v4/spreadsheets/{{4.spreadsheet_id}}/values/%27Dead%20Letter%27!H:H",
+                                        "method": "GET",
+                                        "headers": [],
+                                        "qs": []
+                                      },
+                                      "metadata": {
+                                        "designer": {
+                                          "x": 6300,
+                                          "y": 600,
+                                          "name": "Read Dead Letter keys"
+                                        }
+                                      },
+                                      "onerror": [
+                                        {
+                                          "id": 3600,
+                                          "module": "builtin:Break",
+                                          "version": 1,
+                                          "parameters": {},
+                                          "mapper": {
+                                            "retry": true,
+                                            "count": 3,
+                                            "interval": 5
+                                          },
+                                          "metadata": {
+                                            "designer": {
+                                              "x": 0,
+                                              "y": 0
+                                            }
+                                          }
+                                        }
+                                      ],
+                                      "filter": {
+                                        "name": "Final answer invalid",
+                                        "conditions": [
+                                          [
+                                            {
+                                              "a": "{{replace(trim(replace(lower(18.category); /[^a-z]+/g; space)); space; \"_\")}}",
+                                              "b": "^(hot_lead|cold_lead|support|spam)$",
+                                              "o": "text:notpattern"
+                                            }
+                                          ],
+                                          [
+                                            {
+                                              "a": "{{replace(trim(replace(lower(18.category); /[^a-z]+/g; space)); space; \"_\")}}",
+                                              "b": "spam",
+                                              "o": "text:notequal"
+                                            },
+                                            {
+                                              "a": "{{18.reply_draft}}",
+                                              "o": "notexist"
+                                            }
+                                          ]
+                                        ]
+                                      }
+                                    },
+                                    {
                                       "id": 22,
                                       "module": "google-sheets:addRow",
                                       "version": 2,
@@ -746,35 +896,25 @@
                                           "3": "{{4.message_id}}",
                                           "4": "repair validate",
                                           "5": "Invalid category or missing reply_draft after one repair",
-                                          "6": "{{substring(ifempty(17.value; 11.data.candidates[1].content.parts[1].text); 0; 500)}}"
+                                          "6": "{{substring(ifempty(17.value; 11.data.candidates[1].content.parts[1].text); 0; 500)}}",
+                                          "7": "{{4.message_id}}:repair validate"
                                         }
                                       },
                                       "metadata": {
                                         "designer": {
-                                          "x": 6300,
+                                          "x": 6600,
                                           "y": 600,
                                           "name": "Dead Letter: invalid AI output"
                                         }
                                       },
                                       "filter": {
-                                        "name": "Final answer invalid",
+                                        "name": "Not written yet",
                                         "conditions": [
                                           [
                                             {
-                                              "a": "{{replace(trim(replace(lower(18.category); /[^a-z]+/g; space)); space; \"_\")}}",
-                                              "b": "^(hot_lead|cold_lead|support|spam)$",
-                                              "o": "text:notpattern"
-                                            }
-                                          ],
-                                          [
-                                            {
-                                              "a": "{{replace(trim(replace(lower(18.category); /[^a-z]+/g; space)); space; \"_\")}}",
-                                              "b": "spam",
-                                              "o": "text:notequal"
-                                            },
-                                            {
-                                              "a": "{{18.reply_draft}}",
-                                              "o": "notexist"
+                                              "a": "{{flatten(36.body.values)}}",
+                                              "b": "{{4.message_id}}:repair validate",
+                                              "o": "array:notcontain"
                                             }
                                           ]
                                         ]
@@ -1327,6 +1467,46 @@
                                         {
                                           "flow": [
                                             {
+                                              "id": 33,
+                                              "module": "google-sheets:makeApiCall",
+                                              "version": 2,
+                                              "parameters": {
+                                                "__IMTCONN__": null
+                                              },
+                                              "mapper": {
+                                                "url": "/v4/spreadsheets/{{4.spreadsheet_id}}/values/%27Run%20Log%27!D:D",
+                                                "method": "GET",
+                                                "headers": [],
+                                                "qs": []
+                                              },
+                                              "metadata": {
+                                                "designer": {
+                                                  "x": 9300,
+                                                  "y": 1200,
+                                                  "name": "Read Run Log message ids"
+                                                }
+                                              },
+                                              "onerror": [
+                                                {
+                                                  "id": 3300,
+                                                  "module": "builtin:Break",
+                                                  "version": 1,
+                                                  "parameters": {},
+                                                  "mapper": {
+                                                    "retry": true,
+                                                    "count": 3,
+                                                    "interval": 5
+                                                  },
+                                                  "metadata": {
+                                                    "designer": {
+                                                      "x": 0,
+                                                      "y": 0
+                                                    }
+                                                  }
+                                                }
+                                              ]
+                                            },
+                                            {
                                               "id": 32,
                                               "module": "google-sheets:addRow",
                                               "version": 2,
@@ -1353,7 +1533,7 @@
                                               },
                                               "metadata": {
                                                 "designer": {
-                                                  "x": 9300,
+                                                  "x": 9600,
                                                   "y": 1200,
                                                   "name": "Add Run Log row"
                                                 }
@@ -1376,7 +1556,19 @@
                                                     }
                                                   }
                                                 }
-                                              ]
+                                              ],
+                                              "filter": {
+                                                "name": "Not logged yet",
+                                                "conditions": [
+                                                  [
+                                                    {
+                                                      "a": "{{flatten(33.body.values)}}",
+                                                      "b": "{{4.message_id}}",
+                                                      "o": "array:notcontain"
+                                                    }
+                                                  ]
+                                                ]
+                                              }
                                             }
                                           ]
                                         }
