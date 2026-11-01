@@ -1,0 +1,114 @@
+{
+  "name": "Lead Inbox: Email intake (demo)",
+  "flow": [
+    {
+      "id": 1,
+      "module": "google-email:watchEmails",
+      "version": 4,
+      "parameters": {
+        "__IMTCONN__": null,
+        "folder": "INBOX",
+        "searchType": "gmail",
+        "query": "-from:me -label:HOT -label:COLD -label:SUPPORT -label:SPAM",
+        "markSeen": false,
+        "maxResults": 5
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0,
+          "name": "Watch emails"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "module": "json:CreateJSON",
+      "version": 1,
+      "parameters": {
+        "type": null,
+        "space": ""
+      },
+      "mapper": {
+        "source": "email",
+        "message_id": "{{1.id}}",
+        "from_name": "{{1.from.name}}",
+        "from_email": "{{1.from.address}}",
+        "subject": "{{1.subject}}",
+        "body": "{{substring(1.text; 0; 4000)}}",
+        "received_at": "{{formatDate(1.date; \"YYYY-MM-DDTHH:mm:ss.SSSZ\")}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 0,
+          "name": "Build lead payload"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "module": "http:MakeRequest",
+      "version": 4,
+      "parameters": {
+        "authenticationType": "apiKey",
+        "apiKeyKeychain": null
+      },
+      "mapper": {
+        "url": "PASTE_WEBHOOK_URL",
+        "method": "post",
+        "contentType": "application/json",
+        "inputMethod": "jsonString",
+        "jsonStringBodyContent": "{{2.json}}",
+        "parseResponse": true,
+        "returnErrorIfHttpFails": true,
+        "timeout": 30
+      },
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": 0,
+          "name": "Send to Process lead"
+        }
+      },
+      "onerror": [
+        {
+          "id": 300,
+          "module": "builtin:Break",
+          "version": 1,
+          "parameters": {},
+          "mapper": {
+            "retry": true,
+            "count": 3,
+            "interval": 5
+          },
+          "metadata": {
+            "designer": {
+              "x": 0,
+              "y": 0
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": true,
+      "freshVariables": false
+    },
+    "designer": {
+      "orphans": []
+    }
+  }
+}
