@@ -85,3 +85,10 @@ test("process-lead: prompts match prompts/", () => {
 test("process-lead: the Gemini model id is set in one place only", () => {
   assert.equal(raw["process-lead.blueprint.json"].split("gemini-3.1-flash-lite").length - 1, 1);
 });
+
+test("README, make/README and the build guide reference both blueprints", () => {
+  for (const doc of ["README.md", "make/README.md", "make/BUILD-GUIDE.md"]) {
+    const text = read(doc);
+    for (const file of FILES) assert.ok(text.includes(file), `${doc} does not mention ${file}`);
+  }
+});

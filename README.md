@@ -43,7 +43,7 @@ flowchart TD
     SP --> LOG
 ```
 
-Google Sheets, Gmail and Gemini calls use retries. Anything that still fails ends up in the Dead Letter tab with the time, source, message id, failed stage, error and a short raw payload.
+Google Sheets, Gmail and Gemini calls use retries. Anything that still fails ends up in the Dead Letter tab with the time, source, message id, failed stage, error and a short raw payload. One difference in the Make.com version: a Gemini, Sheets or Gmail call that still fails after its retries stays in Make's Incomplete executions list instead (see the comparison table below).
 
 ## What happens per category
 
@@ -71,6 +71,10 @@ src/
 n8n/
   lead-inbox.workflow.json     main workflow (Gmail trigger and webhook)
   error-handler.workflow.json  error workflow (Dead Letter row and alert)
+make/
+  BUILD-GUIDE.md               click-by-click build guide for both scenarios
+  process-lead.blueprint.json  Scenario B draft (webhook, Gemini, routing)
+  email-intake.blueprint.json  Scenario A draft (Gmail watch, POST to Scenario B)
 scripts/
   build-n8n-code.mjs     writes dist/n8n-cleanup-snippet.js for an n8n Code node
   sync-n8n-workflows.mjs copies src/cleanup.js and prompts/ into the n8n workflow
@@ -154,7 +158,30 @@ Notes:
 - After changing `src/cleanup.js` or `prompts/*.md`, run `node scripts/sync-n8n-workflows.mjs` and re-import `n8n/lead-inbox.workflow.json`. `npm test` fails if the workflow drifts from the shared code.
 
 
-## Setup: Make.com (coming in run 3)
+## Setup: Make.com
+
+Two scenarios on the Make.com Free plan:
+
+- **Process lead** (`make/process-lead.blueprint.json`): custom webhook, secret check, input check, duplicate check, Gemini classify with one repair, Dead Letter rows, and routing by category, as in the table above.
+- **Email intake** (`make/email-intake.blueprint.json`): watches the demo Gmail inbox with the same search as the n8n trigger and posts each new email to the Process lead webhook.
+
+Follow **[make/BUILD-GUIDE.md](make/BUILD-GUIDE.md)**: it builds both scenarios module by module, with every mapping, filter formula, error handler setting and the connections to create, plus a credit estimate.
+
+Import option: both blueprints can be loaded with **Import Blueprint** in the Make editor. They are hand-written drafts, **NOT VERIFIED** in Make yet, so module names and versions may need fixing (see [make/README.md](make/README.md)). The blueprints committed at the end will be the ones exported from the working scenarios.
+
+Saving credits: keep **Email intake off** outside tests and demos. A polling scenario uses credits on every check, and at a 15-minute interval the checks alone would use more than the 1,000 monthly credits (estimate, see the build guide). Process lead is triggered by its webhook, so it uses credits only when a message arrives.
+
+### n8n vs Make.com in this project
+
+| | n8n | Make.com |
+|---|---|---|
+| Hosting | Self-hosted Community edition in Docker on the laptop (`n8nio/n8n:2.45.7`) | Make's cloud |
+| Cost | $0 | $0 on the Free plan, 1,000 credits a month (Make pricing page) |
+| Workflows | One workflow with two triggers, plus an error workflow | Two scenarios (Free plan limit of 2 active scenarios, NOT VERIFIED on make.com) |
+| Email trigger | Gmail Trigger polls every minute | Gmail Watch emails, 15-minute minimum (NOT VERIFIED on make.com), off outside demos |
+| Cleanup logic | `src/cleanup.js` pasted into Code nodes, unit tested, `npm test` catches drift | Built-in functions and filters in the scenario, same rules but weaker in places (build guide, Part 7) |
+| Error handling | Retry On Fail (3 tries, 5 s apart); a call that still fails becomes a Dead Letter row | Retry error handler (3 attempts, 5 minutes apart); a call that still fails stays in Incomplete executions, data failures become Dead Letter rows |
+| Status | Imported and checked in a local n8n | Blueprints are drafts, NOT VERIFIED until imported in Make |
 
 ## Cost
 
