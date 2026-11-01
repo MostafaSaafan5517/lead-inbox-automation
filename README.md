@@ -144,7 +144,7 @@ Self-hosted n8n Community edition in Docker on your own machine. Workflows were 
    node --env-file=.env scripts/send-test-leads.mjs
    ```
 
-   Valid messages get `202` with the message id, a message without subject and body gets `400`, and a wrong secret is rejected by the Webhook node. Then check the sheet tabs and Gmail Drafts.
+   Valid messages get `202` with the message id, a message without subject and body gets `400`, a wrong or missing secret gets `403` from the Webhook node, and invalid JSON gets `422` from n8n. Then check the sheet tabs and Gmail Drafts.
 
 Notes:
 
