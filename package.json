@@ -1,0 +1,17 @@
+{
+  "name": "lead-inbox-automation",
+  "version": "0.1.0",
+  "description": "AI lead inbox automation built in n8n and Make.com. Demo project with invented data.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "author": "Mostafa Saafan",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test",
+    "build:n8n": "node scripts/build-n8n-code.mjs",
+    "send:dry": "node scripts/send-test-leads.mjs --dry-run"
+  }
+}
