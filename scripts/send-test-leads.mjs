@@ -2,11 +2,11 @@
 // Usage:
 //   node scripts/send-test-leads.mjs --dry-run   (prints what would be sent, no network)
 //   node --env-file=.env scripts/send-test-leads.mjs   (WEBHOOK_URL and WEBHOOK_SECRET in .env)
-//   --delay-ms <n>   wait n ms between requests (default 6000, keeps Gemini and Sheets under their rate limits)
+//   --delay-ms <n>   wait n ms between requests (default 8000, keeps Gemini and Sheets under their rate limits)
 // The URL and secret are read from the environment only and are never printed.
 import { readFileSync } from "node:fs";
 
-const DEFAULT_DELAY_MS = 6000;
+const DEFAULT_DELAY_MS = 8000;
 const TIMEOUT_MS = 30000;
 const OVERSIZE_LENGTH = 20000;
 
