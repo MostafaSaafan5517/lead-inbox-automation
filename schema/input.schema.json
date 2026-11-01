@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Normalized input message",
+  "description": "Shape every trigger (Gmail or web form) is converted to before the AI step.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["source", "message_id", "from_name", "from_email", "subject", "body", "received_at"],
+  "properties": {
+    "source": {
+      "type": "string",
+      "enum": ["email", "form"]
+    },
+    "message_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Gmail message id, or the form submission id. Generated as form-<timestamp>-<random> if a form sends none. Used to skip duplicates."
+    },
+    "from_name": {
+      "type": ["string", "null"]
+    },
+    "from_email": {
+      "type": ["string", "null"]
+    },
+    "subject": {
+      "type": "string",
+      "description": "Trimmed. Empty string if missing."
+    },
+    "body": {
+      "type": "string",
+      "maxLength": 4000,
+      "description": "Trimmed plain text, cut to 4000 characters to cap AI cost."
+    },
+    "received_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp. Filled with the processing time if missing."
+    }
+  }
+}
