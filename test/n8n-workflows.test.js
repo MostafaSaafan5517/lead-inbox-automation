@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildSnippet } from "../scripts/build-n8n-code.mjs";
 import { SNIPPET_HEADER, expectedPrompts } from "../scripts/sync-n8n-workflows.mjs";
+import { findSecretLikeStrings } from "./secret-scan.js";
 
 const FILES = ["lead-inbox.workflow.json", "error-handler.workflow.json"];
 const CREDENTIAL_NAMES = {
@@ -10,24 +11,8 @@ const CREDENTIAL_NAMES = {
   googleSheetsOAuth2Api: "Demo Sheets",
   httpHeaderAuth: ["Gemini API key", "Webhook secret"],
 };
-const SECRET_PATTERNS = [
-  /AIza[0-9A-Za-z_-]{30,}/, // Google API key
-  /ya29\.[0-9A-Za-z_-]+/, // Google OAuth access token
-  /1\/\/0[0-9A-Za-z_-]{20,}/, // Google OAuth refresh token
-  /GOCSPX-[0-9A-Za-z_-]+/, // Google OAuth client secret
-  /\bsk-[0-9A-Za-z]{20,}/,
-  /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
-];
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-
 const raw = Object.fromEntries(FILES.map((file) => [file, readFileSync(new URL(`../n8n/${file}`, import.meta.url), "utf8")]));
 const workflows = Object.fromEntries(FILES.map((file) => [file, JSON.parse(raw[file])]));
-
-function allStrings(value, out = []) {
-  if (typeof value === "string") out.push(value);
-  else if (value && typeof value === "object") for (const child of Object.values(value)) allStrings(child, out);
-  return out;
-}
 
 for (const file of FILES) {
   const workflow = workflows[file];
@@ -62,12 +47,7 @@ for (const file of FILES) {
   });
 
   test(`${file}: no string looks like a secret`, () => {
-    for (const text of allStrings(workflow)) {
-      for (const pattern of SECRET_PATTERNS) assert.doesNotMatch(text, pattern);
-      for (const token of text.match(/[A-Za-z0-9+/_=-]{40,}/g) ?? []) {
-        assert.ok(UUID.test(token), `long token-like string: ${token.slice(0, 12)}...`);
-      }
-    }
+    assert.deepEqual(findSecretLikeStrings(workflow), []);
   });
 
   test(`${file}: no em dash`, () => {
