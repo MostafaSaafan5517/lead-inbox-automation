@@ -1,0 +1,209 @@
+{
+  "name": "Lead Inbox error handler (demo)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "5cc110a0-4038-4be6-8989-b4dc4a8a4bba",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "093fff21-21f9-4d36-82c7-0f9b61f126f3",
+              "name": "alert_to",
+              "value": "demo-inbox@example.com",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "ab669f54-c086-44b0-9e83-2fcfd8715758",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "318305d7-afe8-4592-97a9-ecc6de47f500",
+              "name": "time",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "213ab424-babf-4826-aa51-968a7cc7649a",
+              "name": "tool",
+              "value": "n8n",
+              "type": "string"
+            },
+            {
+              "id": "a870c947-e7b8-4fef-ac06-ec91a4c143e0",
+              "name": "source",
+              "value": "error_workflow",
+              "type": "string"
+            },
+            {
+              "id": "e32a607e-493c-4f03-a176-d2b064406d4e",
+              "name": "message_id",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "e67fc600-3f7c-402f-b976-5fde77e3c16b",
+              "name": "stage",
+              "value": "={{ $json.execution.lastNodeExecuted ?? 'unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "051fce07-f74b-423e-b006-2ecdf7396d63",
+              "name": "error",
+              "value": "={{ $json.execution.error?.message ?? 'Unknown error' }}",
+              "type": "string"
+            },
+            {
+              "id": "3bd82ce8-3f72-4181-916d-d69e691e3bac",
+              "name": "raw_payload",
+              "value": "={{ JSON.stringify({ execution_id: $json.execution.id ?? null, workflow_name: $json.workflow.name, mode: $json.execution.mode }) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "71436195-92fa-4b1b-bad7-cb8759628a13",
+      "name": "Shape Dead Letter row",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        440,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Dead Letter"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "e821fe4d-e237-4541-88a2-5706901c21ee",
+      "name": "Add Dead Letter row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        660,
+        -100
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Demo Sheets"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.alert_to }}",
+        "subject": "=[DEMO ALERT] Workflow failed: {{ $json.workflow.name }}",
+        "emailType": "text",
+        "message": "=Workflow: {{ $json.workflow.name }}\nExecution id: {{ $json.execution.id ?? 'none' }}\nFailed at node: {{ $json.execution.lastNodeExecuted ?? 'unknown' }}\nError: {{ $json.execution.error?.message ?? 'Unknown error' }}\n\nA row was added to the Dead Letter tab.",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "d0dab55a-8450-4f4f-b707-53d4d1a77eba",
+      "name": "Send error alert",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        100
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Demo Gmail"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Shape Dead Letter row",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send error alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape Dead Letter row": {
+      "main": [
+        [
+          {
+            "node": "Add Dead Letter row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "active": false
+}
