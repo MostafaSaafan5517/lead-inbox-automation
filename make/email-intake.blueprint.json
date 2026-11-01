@@ -9,7 +9,7 @@
         "__IMTCONN__": null,
         "folder": "INBOX",
         "searchType": "gmail",
-        "query": "-from:me -label:HOT -label:COLD -label:SUPPORT -label:SPAM",
+        "query": "-from:me -label:HOT -label:COLD -label:SUPPORT -label:JUNK",
         "markSeen": false,
         "maxResults": 5
       },

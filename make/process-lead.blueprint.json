@@ -1291,7 +1291,7 @@
                                               "mapper": {
                                                 "messageId": "{{4.message_id}}",
                                                 "labelsToAdd": [
-                                                  "SPAM"
+                                                  "JUNK"
                                                 ],
                                                 "labelsToRemove": []
                                               },
@@ -1299,7 +1299,7 @@
                                                 "designer": {
                                                   "x": 9000,
                                                   "y": 900,
-                                                  "name": "Label SPAM"
+                                                  "name": "Label JUNK"
                                                 }
                                               },
                                               "onerror": [
@@ -1347,7 +1347,7 @@
                                                   "2": "{{4.source}}",
                                                   "3": "{{4.message_id}}",
                                                   "4": "{{23.category}}",
-                                                  "5": "{{switch(23.category; \"hot_lead\"; \"Leads row, draft, HOT label, alert\"; \"cold_lead\"; \"Leads row, draft, COLD label\"; \"support\"; \"Leads row, draft, SUPPORT label\"; \"SPAM label only\")}}",
+                                                  "5": "{{switch(23.category; \"hot_lead\"; \"Leads row, draft, HOT label, alert\"; \"cold_lead\"; \"Leads row, draft, COLD label\"; \"support\"; \"Leads row, draft, SUPPORT label\"; \"JUNK label only\")}}",
                                                   "6": "{{23.reason}}"
                                                 }
                                               },

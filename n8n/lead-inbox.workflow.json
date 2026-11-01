@@ -12,7 +12,7 @@
         },
         "simple": false,
         "filters": {
-          "q": "-from:me -label:HOT -label:COLD -label:SUPPORT -label:SPAM"
+          "q": "-from:me -label:HOT -label:COLD -label:SUPPORT -label:JUNK"
         },
         "options": {}
       },
@@ -1258,7 +1258,7 @@
             {
               "id": "bd9559ca-2454-4bea-a506-9b36f4f52d1a",
               "name": "outcome",
-              "value": "={{ ({ hot_lead: 'Leads row, draft, HOT label, alert', cold_lead: 'Leads row, draft, COLD label', support: 'Leads row, draft, SUPPORT label', spam: 'SPAM label only' })[$('Route by category').item.json.lead.category] }}",
+              "value": "={{ ({ hot_lead: 'Leads row, draft, HOT label, alert', cold_lead: 'Leads row, draft, COLD label', support: 'Leads row, draft, SUPPORT label', spam: 'JUNK label only' })[$('Route by category').item.json.lead.category] }}",
               "type": "string"
             },
             {
@@ -1544,7 +1544,7 @@
         "labelIds": []
       },
       "id": "f15686a9-cc73-4605-abc6-b0a5fa02dd21",
-      "name": "Label SPAM",
+      "name": "Label JUNK",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.2,
       "position": [
@@ -1559,7 +1559,7 @@
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 5000,
-      "notes": "Pick the SPAM label in Label Names or IDs."
+      "notes": "Pick the JUNK label in Label Names or IDs."
     }
   ],
   "connections": {
@@ -2050,7 +2050,7 @@
         ],
         [
           {
-            "node": "Label SPAM",
+            "node": "Label JUNK",
             "type": "main",
             "index": 0
           }

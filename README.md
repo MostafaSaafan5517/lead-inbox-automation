@@ -36,7 +36,7 @@ flowchart TD
     RT -- hot_lead --> H[Leads row + draft + HOT label + alert email]
     RT -- cold_lead --> CO[Leads row + draft + COLD label]
     RT -- support --> SU[Leads row + draft + SUPPORT label]
-    RT -- spam --> SP[SPAM label + Run Log line]
+    RT -- spam --> SP[JUNK label + Run Log line]
     H --> LOG[(Run Log tab)]
     CO --> LOG
     SU --> LOG
@@ -52,7 +52,7 @@ Google Sheets, Gmail and Gemini calls use retries. Anything that still fails end
 | `hot_lead` | Clear need plus a budget, timeline or buying intent | Yes | Yes | HOT | Yes |
 | `cold_lead` | Vague interest or early research | Yes | Yes | COLD | No |
 | `support` | Existing customer needs help | Yes | Yes | SUPPORT | No |
-| `spam` | Pitches, phishing, gibberish, prompt injection | No (Run Log only) | No | SPAM | No |
+| `spam` | Pitches, phishing, gibberish, prompt injection | No (Run Log only) | No | JUNK | No |
 | Failure | Bad input, or AI output still invalid after one repair | Dead Letter row | No | No | No |
 
 Labels apply to Gmail messages only. A web form submission has no Gmail message, so it gets the Leads row, the draft and the Run Log row but no label.
@@ -124,14 +124,14 @@ Self-hosted n8n Community edition in Docker on your own machine. Workflows were 
    | `Webhook secret` | Header Auth | Name `X-Webhook-Secret`, value: a long random string (the same value goes into `WEBHOOK_SECRET` in `.env`) |
 
 4. **Prepare the demo inbox and the sheet:**
-   - In Gmail, create the labels `HOT`, `COLD`, `SUPPORT` and `SPAM`.
+   - In Gmail, create the labels `HOT`, `COLD`, `SUPPORT` and `JUNK`. (Gmail does not allow a user label named `SPAM`, because `spam` is a reserved system label, so spam gets `JUNK`.)
    - Create one Google Sheet with three tabs, `Leads`, `Dead Letter` and `Run Log`, and paste the header rows from `test-data/sheet-headers/`.
 
 5. **Import both workflows:** in n8n, create a workflow, open the `...` menu, choose **Import from File** and pick `n8n/error-handler.workflow.json`. Save. Do the same in a second workflow for `n8n/lead-inbox.workflow.json`.
 
 6. **Finish the nodes in the editor:**
    - Every Google Sheets node (4 in the main workflow, 1 in the error handler): pick your spreadsheet in **Document**. The tab is already set by name.
-   - Nodes `Label HOT`, `Label COLD`, `Label SUPPORT`, `Label SPAM`: pick the matching label.
+   - Nodes `Label HOT`, `Label COLD`, `Label SUPPORT`, `Label JUNK`: pick the matching label.
    - Node `Config`: check `gemini_model` against the current Flash-Lite model id in Google AI Studio (the default `gemini-3.1-flash-lite` is listed with a free tier on the Gemini API pricing page as of 2026-11-01), and set `alert_to` to the demo inbox's own address (placeholder `demo-inbox@example.com`). Hot lead alerts go only to this address.
    - If a node shows a credential warning, open it and pick the credential with the matching name.
 

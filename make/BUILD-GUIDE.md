@@ -33,7 +33,7 @@ You need (all from the build plan's manual steps):
 1. The demo Gmail account, signed in in your browser.
 2. A Make.com Free account. Sign in.
 3. The Google Sheet with three tabs, `Leads`, `Dead Letter` and `Run Log`, with the header rows from `test-data/sheet-headers/`. The Leads tab must keep `message_id` in **column E**, because the duplicate check reads that column.
-4. The Gmail labels `HOT`, `COLD`, `SUPPORT` and `SPAM` in the demo inbox.
+4. The Gmail labels `HOT`, `COLD`, `SUPPORT` and `JUNK` in the demo inbox.
 5. A Gemini API key from Google AI Studio, signed in as the demo account, no billing. Keep it in your password manager. You paste it into Make once, in step 2.3.
 6. A long random webhook secret (for example 40 random letters and digits). Keep it in your password manager and in your local `.env` as `WEBHOOK_SECRET`. Never commit it.
 
@@ -323,16 +323,16 @@ Add a **Router** after module 23 (number 24) with **seven routes**, in this orde
    | 3 | `Email and hot_lead` | `{{4.source}}` Equal to `email`, `{{23.category}}` Equal to `hot_lead` | HOT |
    | 4 | `Email and cold_lead` | ... `cold_lead` | COLD |
    | 5 | `Email and support` | ... `support` | SUPPORT |
-   | 6 | `Email and spam` | ... `spam` | SPAM |
+   | 6 | `Email and spam` | ... `spam` | JUNK |
 
    Web form messages have no Gmail message, so they skip all four.
 7. **Run Log.** No filter. Module 32: **Google Sheets**, **Add a row** to `Run Log` (Retry error handler): time (the `formatDate(now; ...)` formula), tool `make`, source `{{4.source}}`, message_id `{{4.message_id}}`, category `{{23.category}}`, note `{{23.reason}}`, outcome:
 
    ```text
-   {{switch(23.category; "hot_lead"; "Leads row, draft, HOT label, alert"; "cold_lead"; "Leads row, draft, COLD label"; "support"; "Leads row, draft, SUPPORT label"; "SPAM label only")}}
+   {{switch(23.category; "hot_lead"; "Leads row, draft, HOT label, alert"; "cold_lead"; "Leads row, draft, COLD label"; "support"; "Leads row, draft, SUPPORT label"; "JUNK label only")}}
    ```
 
-Spam therefore gets only the SPAM label (email only) and a Run Log row, with no draft and no Leads row, like the n8n version.
+Spam therefore gets only the JUNK label (email only) and a Run Log row, with no draft and no Leads row, like the n8n version.
 
 ### Retry handler settings
 
@@ -380,7 +380,7 @@ Create a new scenario, rename it `Lead Inbox: Email intake (demo)`. Optional: **
 2. Folder: `INBOX`. Filter type: Gmail search query, if offered, with:
 
    ```text
-   -from:me -label:HOT -label:COLD -label:SUPPORT -label:SPAM
+   -from:me -label:HOT -label:COLD -label:SUPPORT -label:JUNK
    ```
 
    This is the same search as the n8n Gmail Trigger: it skips the alerts the demo inbox sends itself and mail that already has a label. If the module has no search query field (NOT VERIFIED for the current Gmail app), leave the criteria at "all emails" and add a filter on the link to module 2: sender email address **Not equal to** the demo inbox address.
