@@ -43,7 +43,21 @@ flowchart TD
     SP --> LOG
 ```
 
-Google Sheets, Gmail and Gemini calls use retries. Anything that still fails ends up in the Dead Letter tab with the time, source, message id, failed stage, error and a short raw payload. One difference in the Make.com version: a Gemini, Sheets or Gmail call that still fails after its retries stays in Make's Incomplete executions list instead (see the comparison table below).
+Google Sheets, Gmail and Gemini calls use retries. Anything that still fails ends up in the Dead Letter tab with the time, source, message id, failed stage, error, a short raw payload and a `dead_letter_key`. One difference in the Make.com version: a Gemini, Sheets or Gmail call that still fails after its retries stays in Make's Incomplete executions list instead (see the comparison table below).
+
+### Why retries do not create duplicate rows
+
+A plain "append row" is not safe to retry. In the first live test of the n8n version, the Dead Letter write for one message hit a Google Sheets `429` (read requests per minute), Retry On Fail ran it again, and the tab got three identical rows from one execution. So every Sheets write now has a key column and is an **append or update** on that key:
+
+| Tab | Key column | Effect |
+|---|---|---|
+| `Leads` | `message_id` | One row per message |
+| `Run Log` | `message_id` | One row per message |
+| `Dead Letter` | `dead_letter_key` = message id + `:` + stage (for example `demo-bad-empty:normalize`) | The same failure is written once; a failure at another stage of the same message still gets its own row |
+
+When a failure has no message id (or comes from the error workflow), the key uses the execution id instead, for example `execution-123:Find in Leads`, so unrelated failures never overwrite each other.
+
+In n8n this is the Google Sheets node's **Append or Update Row** operation, matched on the key column. A retry finds the row that the first try already wrote and updates it instead of adding a second one, so Retry On Fail stays on (3 tries, 5 s apart). Make.com has no single append-or-update module for Google Sheets (NOT VERIFIED, none found), so the Make version reads the key column first and adds the row only when the key is missing (see the build guide).
 
 ## What happens per category
 
@@ -53,7 +67,7 @@ Google Sheets, Gmail and Gemini calls use retries. Anything that still fails end
 | `cold_lead` | Vague interest or early research | Yes | Yes | COLD | No |
 | `support` | Existing customer needs help | Yes | Yes | SUPPORT | No |
 | `spam` | Pitches, phishing, gibberish, prompt injection | No (Run Log only) | No | JUNK | No |
-| Failure | Bad input, or AI output still invalid after one repair | Dead Letter row | No | No | No |
+| Failure | Bad input, or AI output still invalid after one repair | Dead Letter row (one per message and stage) | No | No | No |
 
 Labels apply to Gmail messages only. A web form submission has no Gmail message, so it gets the Leads row, the draft and the Run Log row but no label.
 
@@ -125,7 +139,7 @@ Self-hosted n8n Community edition in Docker on your own machine. Workflows were 
 
 4. **Prepare the demo inbox and the sheet:**
    - In Gmail, create the labels `HOT`, `COLD`, `SUPPORT` and `JUNK`. (Gmail does not allow a user label named `SPAM`, because `spam` is a reserved system label, so spam gets `JUNK`.)
-   - Create one Google Sheet with three tabs, `Leads`, `Dead Letter` and `Run Log`, and paste the header rows from `test-data/sheet-headers/`.
+   - Create one Google Sheet with three tabs, `Leads`, `Dead Letter` and `Run Log`, and paste the header rows from `test-data/sheet-headers/`. The key columns (`message_id`, and `dead_letter_key` in Dead Letter) must be in the header, because the writes match on them. If your Dead Letter tab is from before 2026-11-01, add `dead_letter_key` as column H.
 
 5. **Import both workflows:** in n8n, create a workflow, open the `...` menu, choose **Import from File** and pick `n8n/error-handler.workflow.json`. Save. Do the same in a second workflow for `n8n/lead-inbox.workflow.json`.
 
@@ -180,7 +194,7 @@ Saving credits: keep **Email intake off** outside tests and demos. A polling sce
 | Workflows | One workflow with two triggers, plus an error workflow | Two scenarios (Free plan limit of 2 active scenarios, NOT VERIFIED on make.com) |
 | Email trigger | Gmail Trigger polls every minute | Gmail Watch emails, 15-minute minimum (NOT VERIFIED on make.com), off outside demos |
 | Cleanup logic | `src/cleanup.js` pasted into Code nodes, unit tested, `npm test` catches drift | Built-in functions and filters in the scenario, same rules but weaker in places (build guide, Part 7) |
-| Error handling | Retry On Fail (3 tries, 5 s apart); a call that still fails becomes a Dead Letter row | Retry error handler (3 attempts, 5 minutes apart); a call that still fails stays in Incomplete executions, data failures become Dead Letter rows |
+| Error handling | Retry On Fail (3 tries, 5 s apart); Sheets writes are append-or-update on a key, so a retry never adds a second row; a call that still fails becomes a Dead Letter row | Retry error handler (3 attempts, 5 minutes apart); a call that still fails stays in Incomplete executions, data failures become Dead Letter rows |
 | Status | Imported and checked in a local n8n | Blueprints are drafts, NOT VERIFIED until imported in Make |
 
 ## Cost

@@ -365,6 +365,12 @@
               "name": "raw_payload",
               "value": "={{ JSON.stringify($('Webhook').isExecuted ? $('Webhook').item.json.body : { subject: $('Gmail Trigger').item.json.subject }).slice(0, 500) }}",
               "type": "string"
+            },
+            {
+              "id": "add498a6-2c0f-4341-bbc2-63514da66d40",
+              "name": "dead_letter_key",
+              "value": "={{ (($('Webhook').isExecuted ? ($('Webhook').item.json.body?.message_id ?? '') : $('Gmail Trigger').item.json.id) || 'execution-' + $execution.id) + ':' + $json.stage }}",
+              "type": "string"
             }
           ]
         },
@@ -751,6 +757,12 @@
               "name": "raw_payload",
               "value": "={{ $json.ai_text.slice(0, 500) }}",
               "type": "string"
+            },
+            {
+              "id": "f8738539-9393-4465-9839-9306af43d26f",
+              "name": "dead_letter_key",
+              "value": "={{ ($json.message.message_id || 'execution-' + $execution.id) + ':repair ' + $json.stage }}",
+              "type": "string"
             }
           ]
         },
@@ -810,6 +822,12 @@
               "name": "raw_payload",
               "value": "={{ String($json.message?.subject ?? '').slice(0, 500) }}",
               "type": "string"
+            },
+            {
+              "id": "a96f9c30-bf68-4d92-9bf6-55116a28abb7",
+              "name": "dead_letter_key",
+              "value": "={{ ($json.message?.message_id || 'execution-' + $execution.id) + ':' + ($json.first_error ? 'repair call' : 'classify call') }}",
+              "type": "string"
             }
           ]
         },
@@ -826,7 +844,7 @@
     },
     {
       "parameters": {
-        "operation": "append",
+        "operation": "appendOrUpdate",
         "documentId": {
           "__rl": true,
           "mode": "list",
@@ -840,7 +858,9 @@
         "columns": {
           "mappingMode": "autoMapInputData",
           "value": {},
-          "matchingColumns": [],
+          "matchingColumns": [
+            "dead_letter_key"
+          ],
           "schema": []
         },
         "options": {}
@@ -1124,7 +1144,7 @@
     },
     {
       "parameters": {
-        "operation": "append",
+        "operation": "appendOrUpdate",
         "documentId": {
           "__rl": true,
           "mode": "list",
@@ -1138,7 +1158,9 @@
         "columns": {
           "mappingMode": "autoMapInputData",
           "value": {},
-          "matchingColumns": [],
+          "matchingColumns": [
+            "message_id"
+          ],
           "schema": []
         },
         "options": {}
@@ -1282,7 +1304,7 @@
     },
     {
       "parameters": {
-        "operation": "append",
+        "operation": "appendOrUpdate",
         "documentId": {
           "__rl": true,
           "mode": "list",
@@ -1296,7 +1318,9 @@
         "columns": {
           "mappingMode": "autoMapInputData",
           "value": {},
-          "matchingColumns": [],
+          "matchingColumns": [
+            "message_id"
+          ],
           "schema": []
         },
         "options": {}

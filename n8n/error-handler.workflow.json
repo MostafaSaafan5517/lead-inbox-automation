@@ -81,6 +81,12 @@
               "name": "raw_payload",
               "value": "={{ JSON.stringify({ execution_id: $json.execution.id ?? null, workflow_name: $json.workflow.name, mode: $json.execution.mode }) }}",
               "type": "string"
+            },
+            {
+              "id": "84ffec37-17eb-4d5e-9ca2-228c2af8daec",
+              "name": "dead_letter_key",
+              "value": "={{ 'execution-' + ($json.execution.id ?? 'error-' + $execution.id) + ':' + ($json.execution.lastNodeExecuted ?? 'unknown') }}",
+              "type": "string"
             }
           ]
         },
@@ -97,7 +103,7 @@
     },
     {
       "parameters": {
-        "operation": "append",
+        "operation": "appendOrUpdate",
         "documentId": {
           "__rl": true,
           "mode": "list",
@@ -111,7 +117,9 @@
         "columns": {
           "mappingMode": "autoMapInputData",
           "value": {},
-          "matchingColumns": [],
+          "matchingColumns": [
+            "dead_letter_key"
+          ],
           "schema": []
         },
         "options": {}
