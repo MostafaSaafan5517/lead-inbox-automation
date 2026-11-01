@@ -40,9 +40,10 @@ flowchart TD
     H --> LOG[(Run Log tab)]
     CO --> LOG
     SU --> LOG
+    SP --> LOG
 ```
 
-Google Sheets and Gemini calls use retries. Anything that still fails ends up in the Dead Letter tab with the time, source, message id, failed stage, error and a short raw payload.
+Google Sheets, Gmail and Gemini calls use retries. Anything that still fails ends up in the Dead Letter tab with the time, source, message id, failed stage, error and a short raw payload.
 
 ## What happens per category
 
@@ -53,6 +54,8 @@ Google Sheets and Gemini calls use retries. Anything that still fails ends up in
 | `support` | Existing customer needs help | Yes | Yes | SUPPORT | No |
 | `spam` | Pitches, phishing, gibberish, prompt injection | No (Run Log only) | No | SPAM | No |
 | Failure | Bad input, or AI output still invalid after one repair | Dead Letter row | No | No | No |
+
+Labels apply to Gmail messages only. A web form submission has no Gmail message, so it gets the Leads row, the draft and the Run Log row but no label.
 
 ## Repo layout
 
@@ -65,8 +68,12 @@ prompts/
   repair.md              one-shot repair prompt
 src/
   cleanup.js             normalizeInput and cleanAiOutput, no dependencies
+n8n/
+  lead-inbox.workflow.json     main workflow (Gmail trigger and webhook)
+  error-handler.workflow.json  error workflow (Dead Letter row and alert)
 scripts/
   build-n8n-code.mjs     writes dist/n8n-cleanup-snippet.js for an n8n Code node
+  sync-n8n-workflows.mjs copies src/cleanup.js and prompts/ into the n8n workflow
   send-test-leads.mjs    posts the demo messages and bad cases to the webhook
 test/                    node:test unit tests
 test-data/
@@ -86,7 +93,66 @@ node scripts/send-test-leads.mjs --dry-run # shows the 16 test requests, no netw
 
 To send the test requests to a real webhook, copy `.env.example` to `.env`, fill in `WEBHOOK_URL` and `WEBHOOK_SECRET`, then run `node --env-file=.env scripts/send-test-leads.mjs`. The script never prints either value. It sends the 12 demo messages, then four bad cases (wrong secret, missing body and subject, oversize body, invalid JSON), and prints a table of expected and actual results.
 
-## Setup: n8n (coming in run 2)
+## Setup: n8n
+
+Self-hosted n8n Community edition in Docker on your own machine. Workflows were checked by importing them into `n8nio/n8n:2.45.7`.
+
+1. **Start n8n** (named volume `n8n_data`, port 5678, pinned version):
+
+   ```bash
+   docker run -d --name n8n -p 5678:5678 -v n8n_data:/home/node/.n8n n8nio/n8n:2.45.7
+   ```
+
+   Open http://localhost:5678 and create the local owner login. It only exists on your machine.
+
+2. **Google Cloud project** (no billing account needed), signed in with the demo Gmail account:
+   - Enable the **Gmail API** and the **Google Sheets API**.
+   - OAuth consent screen: External, publishing status **Testing**, add the demo account as a **test user**.
+   - Create an OAuth client of type **Web application**. As the authorized redirect URI, paste the **OAuth Redirect URL** that n8n shows in the credential dialog of the next step.
+
+3. **Create the 4 credentials in n8n** (Overview, Credentials, Create). Use exactly these names, the workflows look them up by name:
+
+   | Name | Type | What to enter |
+   |---|---|---|
+   | `Demo Gmail` | Gmail OAuth2 API | Client ID and secret from step 2, then Sign in with Google as the demo account |
+   | `Demo Sheets` | Google Sheets OAuth2 API | Same client ID and secret, sign in as the demo account |
+   | `Gemini API key` | Header Auth | Name `x-goog-api-key`, value: your Gemini API key from Google AI Studio |
+   | `Webhook secret` | Header Auth | Name `X-Webhook-Secret`, value: a long random string (the same value goes into `WEBHOOK_SECRET` in `.env`) |
+
+4. **Prepare the demo inbox and the sheet:**
+   - In Gmail, create the labels `HOT`, `COLD`, `SUPPORT` and `SPAM`.
+   - Create one Google Sheet with three tabs, `Leads`, `Dead Letter` and `Run Log`, and paste the header rows from `test-data/sheet-headers/`.
+
+5. **Import both workflows:** in n8n, create a workflow, open the `...` menu, choose **Import from File** and pick `n8n/error-handler.workflow.json`. Save. Do the same in a second workflow for `n8n/lead-inbox.workflow.json`.
+
+6. **Finish the nodes in the editor:**
+   - Every Google Sheets node (4 in the main workflow, 1 in the error handler): pick your spreadsheet in **Document**. The tab is already set by name.
+   - Nodes `Label HOT`, `Label COLD`, `Label SUPPORT`, `Label SPAM`: pick the matching label.
+   - Node `Config`: check `gemini_model` against the current Flash-Lite model id in Google AI Studio (the default `gemini-2.5-flash-lite` is not verified), and set `alert_to` to the demo inbox's own address (placeholder `demo-inbox@example.com`). Hot lead alerts go only to this address.
+   - If a node shows a credential warning, open it and pick the credential with the matching name.
+
+7. **Set the error workflow:** in the main workflow, open **Settings** and set **Error workflow** to `Lead Inbox error handler (demo)`. Save.
+
+8. **Activate** (publish) the main workflow.
+
+9. **Run the test script** against the production webhook URL (shown in the Webhook node, Production URL tab):
+
+   ```bash
+   cp .env.example .env
+   # WEBHOOK_URL=http://localhost:5678/webhook/lead-inbox
+   # WEBHOOK_SECRET=<the value from the Webhook secret credential>
+   node --env-file=.env scripts/send-test-leads.mjs
+   ```
+
+   Valid messages get `202` with the message id, a message without subject and body gets `400`, and a wrong secret is rejected by the Webhook node. Then check the sheet tabs and Gmail Drafts.
+
+Notes:
+
+- The Gmail Trigger **polls** every minute, so no public URL is needed for email. It skips mail sent by the demo inbox itself (the alerts) and mail that already has one of the four labels.
+- The test script runs on the same machine, so it needs **no tunnel**. A tunnel (for example `cloudflared` or `ngrok`) is only needed if the web form is called from outside the laptop.
+- Drafts are never sent. The only email the flow sends is the alert, and it goes to the demo inbox.
+- After changing `src/cleanup.js` or `prompts/*.md`, run `node scripts/sync-n8n-workflows.mjs` and re-import `n8n/lead-inbox.workflow.json`. `npm test` fails if the workflow drifts from the shared code.
+
 
 ## Setup: Make.com (coming in run 3)
 
