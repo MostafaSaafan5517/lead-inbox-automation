@@ -116,7 +116,7 @@ node scripts/send-test-leads.mjs --dry-run # shows the 16 test requests, no netw
 
 To send the test requests to a real webhook, copy `.env.example` to `.env`, fill in `WEBHOOK_URL` and `WEBHOOK_SECRET`, then run `node --env-file=.env scripts/send-test-leads.mjs`. The script never prints either value. It sends the 12 demo messages, then four bad cases (wrong secret, missing body and subject, oversize body, invalid JSON), and prints a table of expected and actual results.
 
-The script waits 6 seconds between requests. Change it with `--delay-ms`, for example `node --env-file=.env scripts/send-test-leads.mjs --delay-ms 10000`.
+The script waits 8 seconds between requests. Change it with `--delay-ms`, for example `node --env-file=.env scripts/send-test-leads.mjs --delay-ms 10000`.
 
 ### Google Sheets quota
 
