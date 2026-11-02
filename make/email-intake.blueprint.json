@@ -3,112 +3,101 @@
   "flow": [
     {
       "id": 1,
-      "module": "google-email:watchEmails",
+      "module": "google-email:triggerWatchNewEmails",
       "version": 4,
       "parameters": {
-        "__IMTCONN__": null,
-        "folder": "INBOX",
-        "searchType": "gmail",
-        "query": "-from:me -label:HOT -label:COLD -label:SUPPORT -label:JUNK",
+        "__IMTCONN__": 12608666,
+        "filterType": "gmailSearch",
+        "q": "in:inbox -from:me -from:make.com -from:google.com -label:HOT -label:COLD -label:SUPPORT -label:JUNK",
         "markSeen": false,
-        "maxResults": 5
+        "limit": 5,
+        "format": "full"
       },
       "mapper": {},
       "metadata": {
         "designer": {
-          "x": 300,
+          "x": 0,
           "y": 0,
-          "name": "Watch emails"
+          "name": "Watch demo inbox"
         }
       }
     },
     {
       "id": 2,
-      "module": "json:CreateJSON",
-      "version": 1,
-      "parameters": {
-        "type": null,
-        "space": ""
-      },
-      "mapper": {
-        "source": "email",
-        "message_id": "{{1.id}}",
-        "from_name": "{{1.from.name}}",
-        "from_email": "{{1.from.address}}",
-        "subject": "{{1.subject}}",
-        "body": "{{substring(1.text; 0; 4000)}}",
-        "received_at": "{{formatDate(1.date; \"YYYY-MM-DDTHH:mm:ss.SSSZ\")}}"
-      },
-      "metadata": {
-        "designer": {
-          "x": 600,
-          "y": 0,
-          "name": "Build lead payload"
-        }
-      }
-    },
-    {
-      "id": 3,
       "module": "http:MakeRequest",
       "version": 4,
       "parameters": {
-        "authenticationType": "apiKey",
-        "apiKeyKeychain": null
+        "authenticationType": "noAuth"
       },
       "mapper": {
-        "url": "PASTE_WEBHOOK_URL",
+        "url": "PASTE_PROCESS_LEAD_WEBHOOK_URL",
         "method": "post",
-        "contentType": "application/json",
-        "inputMethod": "jsonString",
-        "jsonStringBodyContent": "{{2.json}}",
+        "headers": [
+          {
+            "name": "X-Webhook-Secret",
+            "value": "PASTE_WEBHOOK_SECRET_IN_EDITOR"
+          }
+        ],
+        "timeout": 60,
+        "contentType": "json",
+        "inputMethod": "dataStructure",
+        "shareCookies": false,
         "parseResponse": true,
-        "returnErrorIfHttpFails": true,
-        "timeout": 30
-      },
-      "metadata": {
-        "designer": {
-          "x": 900,
-          "y": 0,
-          "name": "Send to Process lead"
-        }
+        "allowRedirects": true,
+        "stopOnHttpError": true,
+        "bodyDataStructure": 675306,
+        "dataStructureBodyContent": {
+          "body": "{{1.fullTextBody}}",
+          "source": "email",
+          "subject": "{{1.subject}}",
+          "from_name": "{{1.fromName}}",
+          "from_email": "{{1.fromEmail}}",
+          "message_id": "{{1.id}}",
+          "received_at": "{{formatDate(1.internalDate; \"YYYY-MM-DDTHH:mm:ss[Z]\"; \"UTC\")}}"
+        },
+        "requestCompressedContent": true
       },
       "onerror": [
         {
-          "id": 300,
+          "id": 20,
           "module": "builtin:Break",
           "version": 1,
-          "parameters": {},
           "mapper": {
-            "retry": true,
             "count": 3,
-            "interval": 5
+            "retry": true,
+            "interval": 1
           },
+          "parameters": {},
           "metadata": {
             "designer": {
-              "x": 0,
-              "y": 0
+              "x": 300,
+              "y": 300
             }
           }
         }
-      ]
+      ],
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0,
+          "name": "Send to Process lead webhook"
+        }
+      }
     }
   ],
   "metadata": {
     "instant": false,
     "version": 1,
     "scenario": {
-      "roundtrips": 1,
+      "dlq": true,
+      "dataloss": false,
       "maxErrors": 3,
       "autoCommit": true,
-      "autoCommitTriggerLast": true,
-      "sequential": true,
+      "roundtrips": 1,
+      "sequential": false,
       "confidential": false,
-      "dataloss": false,
-      "dlq": true,
-      "freshVariables": false
-    },
-    "designer": {
-      "orphans": []
+      "freshVariables": false,
+      "autoCommitTriggerLast": true
     }
   }
 }

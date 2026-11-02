@@ -7,6 +7,8 @@ const SECRET_PATTERNS = [
   /\bsk-[0-9A-Za-z]{20,}/,
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
 ];
+// Placeholders such as PASTE_SPREADSHEET_ID are not secrets, but next to a URL path they form a long token.
+const PLACEHOLDER = /PASTE_[A-Z_]+/g;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 export function allStrings(value, out = []) {
@@ -20,7 +22,7 @@ export function findSecretLikeStrings(value) {
   const findings = [];
   for (const text of allStrings(value)) {
     for (const pattern of SECRET_PATTERNS) if (pattern.test(text)) findings.push(`matches ${pattern}`);
-    for (const token of text.match(/[A-Za-z0-9+/_=-]{40,}/g) ?? []) {
+    for (const token of text.replace(PLACEHOLDER, "").match(/[A-Za-z0-9+/_=-]{40,}/g) ?? []) {
       if (!UUID.test(token)) findings.push(`long token-like string: ${token.slice(0, 12)}...`);
     }
   }

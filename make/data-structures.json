@@ -1,0 +1,153 @@
+{
+  "note": "Make data structures used by the blueprints. The ids are from the demo account; after import, create these three structures and pick them in the modules named below.",
+  "structures": [
+    {
+      "demo_id": 674285,
+      "name": "Lead Inbox: Gemini request",
+      "used_by": "process-lead: module 8 'Gemini classify' (HTTP, Body structure)",
+      "spec": [
+        {
+          "name": "systemInstruction",
+          "type": "collection",
+          "spec": [
+            {
+              "name": "parts",
+              "type": "array",
+              "spec": {
+                "type": "collection",
+                "spec": [
+                  {
+                    "name": "text",
+                    "type": "text"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "contents",
+          "type": "array",
+          "spec": {
+            "type": "collection",
+            "spec": [
+              {
+                "name": "role",
+                "type": "text"
+              },
+              {
+                "name": "parts",
+                "type": "array",
+                "spec": {
+                  "type": "collection",
+                  "spec": [
+                    {
+                      "name": "text",
+                      "type": "text"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "generationConfig",
+          "type": "collection",
+          "spec": [
+            {
+              "name": "responseMimeType",
+              "type": "text"
+            },
+            {
+              "name": "maxOutputTokens",
+              "type": "number"
+            },
+            {
+              "name": "temperature",
+              "type": "number"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "demo_id": 674286,
+      "name": "Lead Inbox: AI lead",
+      "used_by": "process-lead: module 9 'Parse AI answer' (JSON, Data structure)",
+      "spec": [
+        {
+          "name": "category",
+          "type": "text"
+        },
+        {
+          "name": "confidence",
+          "type": "number"
+        },
+        {
+          "name": "name",
+          "type": "text"
+        },
+        {
+          "name": "company",
+          "type": "text"
+        },
+        {
+          "name": "budget",
+          "type": "text"
+        },
+        {
+          "name": "need",
+          "type": "text"
+        },
+        {
+          "name": "urgency",
+          "type": "text"
+        },
+        {
+          "name": "reply_draft",
+          "type": "text"
+        },
+        {
+          "name": "reason",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "demo_id": 675306,
+      "name": "Lead Inbox email to webhook body",
+      "used_by": "email-intake: module 2 'Send to Process lead webhook' (HTTP, Body structure)",
+      "spec": [
+        {
+          "name": "source",
+          "type": "text"
+        },
+        {
+          "name": "message_id",
+          "type": "text"
+        },
+        {
+          "name": "from_name",
+          "type": "text"
+        },
+        {
+          "name": "from_email",
+          "type": "text"
+        },
+        {
+          "name": "subject",
+          "type": "text"
+        },
+        {
+          "name": "body",
+          "type": "text"
+        },
+        {
+          "name": "received_at",
+          "type": "text"
+        }
+      ]
+    }
+  ]
+}
