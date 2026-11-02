@@ -172,6 +172,15 @@ test("data-structures.json lists every data structure the blueprints use", () =>
   }
 });
 
+test("make/README and the build guide explain every PASTE_ placeholder", () => {
+  const placeholders = new Set([...FILES.map((file) => raw[file]), read("make/data-structures.json")].join("\n").match(/PASTE_[A-Z_]+/g));
+  assert.ok(placeholders.size > 0);
+  for (const doc of ["make/README.md", "make/BUILD-GUIDE.md"]) {
+    const text = read(doc);
+    for (const placeholder of placeholders) assert.ok(text.includes(`\`${placeholder}\``), `${doc} does not list ${placeholder}`);
+  }
+});
+
 test("README, make/README and the build guide reference both blueprints", () => {
   for (const doc of ["README.md", "make/README.md", "make/BUILD-GUIDE.md"]) {
     const text = read(doc);
