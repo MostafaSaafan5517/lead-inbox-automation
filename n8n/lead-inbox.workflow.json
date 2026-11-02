@@ -12,7 +12,7 @@
         },
         "simple": false,
         "filters": {
-          "q": "-from:me -label:HOT -label:COLD -label:SUPPORT -label:JUNK"
+          "q": "-from:me -from:make.com -from:google.com -label:HOT -label:COLD -label:SUPPORT -label:JUNK"
         },
         "options": {}
       },

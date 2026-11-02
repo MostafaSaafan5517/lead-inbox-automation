@@ -182,7 +182,7 @@ Self-hosted n8n Community edition in Docker on your own machine. Workflows were 
 Notes:
 
 - A brand-new Gmail account may put the first test emails in **Spam**. The trigger does not read Spam, so mark them "Not spam" (in the live test the trigger then picked them up on its next poll).
-- The Gmail Trigger **polls** every minute, so no public URL is needed for email. It skips mail sent by the demo inbox itself (the alerts) and mail that already has one of the four labels.
+- The Gmail Trigger **polls** every minute, so no public URL is needed for email. It skips mail sent by the demo inbox itself (the alerts), Make's notification emails and Google's welcome emails (`-from:make.com -from:google.com`, added after the Make email test classified them), and mail that already has one of the four labels.
 - The test script runs on the same machine, so it needs **no tunnel**. A tunnel (for example `cloudflared` or `ngrok`) is only needed if the web form is called from outside the laptop.
 - Drafts are never sent. The only email the flow sends is the alert, and it goes to the demo inbox.
 - After changing `src/cleanup.js` or `prompts/*.md`, run `node scripts/sync-n8n-workflows.mjs` and re-import `n8n/lead-inbox.workflow.json`. `npm test` fails if the workflow drifts from the shared code.

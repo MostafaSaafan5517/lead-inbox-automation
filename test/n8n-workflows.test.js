@@ -114,6 +114,13 @@ test("lead-inbox: Gmail nodes never send to the sender", () => {
   assert.equal(sends[0].parameters.sendTo, "={{ $('Config').first().json.alert_to }}");
 });
 
+test("lead-inbox: the Gmail Trigger skips own mail, Make and Google notices, and labelled mail", () => {
+  const trigger = workflows["lead-inbox.workflow.json"].nodes.find((node) => node.name === "Gmail Trigger");
+  for (const term of ["-from:me", "-from:make.com", "-from:google.com", "-label:HOT", "-label:COLD", "-label:SUPPORT", "-label:JUNK"]) {
+    assert.ok(trigger.parameters.filters.q.split(" ").includes(term), `search lacks ${term}`);
+  }
+});
+
 test("lead-inbox: spam goes to Run Log without a Leads row or draft", () => {
   const connections = workflows["lead-inbox.workflow.json"].connections["Route by category"].main;
   assert.deepEqual(connections[3].map((target) => target.node), ["Shape Run Log row"]);
