@@ -75,6 +75,50 @@ The Make.com version is weaker here: it checks `message_id` against the Leads ta
 
 Labels apply to Gmail messages only. A web form submission has no Gmail message, so it gets the Leads row, the draft and the Run Log row but no label.
 
+## Screenshots
+
+Taken from the live test runs on 2026-11-02 with the demo data in this repo.
+
+**Leads tab:** each lead with its category, confidence, name, company, budget (copied exactly as written), need and urgency.
+
+![Leads tab in Google Sheets](docs/screenshots/01-sheet-leads.png)
+
+**Run Log tab:** one line per message with what the workflow did and the AI's reason.
+
+![Run Log tab in Google Sheets](docs/screenshots/02-sheet-runlog.png)
+
+**Dead Letter tab:** the empty test message is recorded with its stage and error instead of being lost.
+
+![Dead Letter tab in Google Sheets](docs/screenshots/03-sheet-deadletter.png)
+
+**Make.com, Process lead scenario:** secret check, duplicate check, Gemini, JSON parsing, then a route per category. The orange circles are the Retry handlers.
+
+![Make.com Process lead scenario](docs/screenshots/04-make-process-lead.png)
+
+**Make.com, Email intake scenario:** watches the inbox and passes each new email to the Process lead webhook.
+
+![Make.com Email intake scenario](docs/screenshots/05-make-email-intake.png)
+
+**n8n, main workflow:** Gmail trigger and webhook, normalize, duplicate check, Gemini with cleanup and one repair call, routing, Sheets, drafts, labels and the hot lead alert.
+
+![n8n main workflow](docs/screenshots/06-n8n-workflow.png)
+
+**n8n, error workflow:** any failed execution is written to the Dead Letter tab and triggers an error alert email.
+
+![n8n error workflow](docs/screenshots/07-n8n-error-handler.png)
+
+**Gmail labels:** the four test emails after processing (HOT, COLD, SUPPORT, JUNK) and the hot lead alert at the top.
+
+![Gmail inbox with labels](docs/screenshots/08-gmail-labels.png)
+
+**Reply draft:** saved in Gmail Drafts for a person to review. Nothing is sent to the customer automatically.
+
+![Gmail reply draft](docs/screenshots/09-gmail-draft.png)
+
+**Hot lead alert:** name, company, budget, need, urgency and the reason, sent to the business inbox.
+
+![Hot lead alert email](docs/screenshots/10-gmail-hot-alert.png)
+
 ## Repo layout
 
 ```text
