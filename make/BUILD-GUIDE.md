@@ -1,477 +1,181 @@
 # Make.com build guide
 
-A click-by-click guide to build the Make.com version of the lead inbox on the **Free plan**. It builds two scenarios:
+How to set up the Make.com version of the lead inbox on the **Free plan** from the two exported blueprints, and what each module does. It sets up two scenarios:
 
-- **Scenario B, "Process lead"** (`process-lead.blueprint.json`): receives one message on a webhook, checks it, asks Gemini, repairs once if needed, and routes it by category. Build this one first, because Scenario A needs its webhook URL.
-- **Scenario A, "Email intake"** (`email-intake.blueprint.json`): watches the demo Gmail inbox and posts each new email to Scenario B. Keep it **off** outside tests and demos to save credits.
+- **"Process lead"** (`process-lead.blueprint.json`): receives one message on a webhook, checks it, asks Gemini and routes the answer by category. Import this one first, because Email intake needs its webhook URL.
+- **"Email intake"** (`email-intake.blueprint.json`): watches the demo Gmail inbox and posts each new email to Process lead.
 
-The behaviour is the same as the n8n version and the table in the main README. Where Make does something differently or weaker, this guide says so.
+Both blueprints are exports from scenarios that were built and tested in a Make account on 2026-11-02 (results in Part 6). Where the Make version behaves differently from the n8n version, Part 8 says so.
 
-Status: written from Make's public help pages and a published example blueprint, **not yet clicked through in the Make editor**. Menu names and option labels may differ slightly. If something does not match, follow the closest option and note it, so this guide can be corrected after the first build.
+## Free plan limits
 
-## Free plan limits this design respects
+Checked on the account's Subscription page on 2026-11-02:
 
-| Limit | Value | Source |
-|---|---|---|
-| Credits | 1,000 per month | Make pricing page |
-| Active scenarios | 2 | Third-party sources, NOT VERIFIED on make.com |
-| Minimum schedule interval | 15 minutes | Third-party sources, NOT VERIFIED on make.com |
+| Limit | Value |
+|---|---|
+| Price | $0 |
+| Credits | 1,000 per month |
+| Active scenarios | 2 |
+| Minimum scheduling interval | 15 minutes |
+| Execution time | 5 minutes |
+| File size | 5 MB |
+| Log storage | 7 days |
 
-That is why there are exactly two scenarios, why Scenario B is triggered instantly by a webhook, and why Scenario A (the only polling scenario) stays off unless you are testing or recording a demo.
-
-## How to read this guide
-
-- Module numbers (for example **module 4**) are the ids Make shows in the small bubble on each module. Make numbers modules in the order you add them, so add them in the order below and the formulas will match. If your numbers differ, change the number in each formula (for example `4.subject` means "the `subject` output of module 4").
-- Text in `code` is typed or pasted exactly. Formulas such as `{{trim(1.subject)}}` are written in Make's mapping syntax: in the editor, type the function name from the function panel and pick the item from the module's output.
-- A **filter** sits on the link (the dotted line) in front of a module. Click the link, choose **Set up a filter**, give it the label below, then add the conditions. "AND" rows go in the same group; "OR" starts a new group with the **Add OR rule** button.
-- An **error handler** is added by right-clicking a module and choosing **Add error handler**.
+That is why there are exactly two scenarios, why Process lead is triggered instantly by a webhook, and why Email intake (the only polling scenario) stays off outside tests and demos (Part 7).
 
 ## Part 1: Before you start
 
-You need (all from the build plan's manual steps):
-
 1. The demo Gmail account, signed in in your browser.
-2. A Make.com Free account. Sign in.
-3. The Google Sheet with three tabs, `Leads`, `Dead Letter` and `Run Log`, with the header rows from `test-data/sheet-headers/`. Keep the column order of those files: the duplicate and "write once" checks read fixed columns, `message_id` in **column E** of Leads and **column D** of Run Log, and `dead_letter_key` in **column H** of Dead Letter.
+2. A Make.com Free account.
+3. The Google Sheet with three tabs, `Leads`, `Dead Letter` and `Run Log`, with the header rows from `test-data/sheet-headers/`. Keep the column order: the duplicate check reads `message_id` from **column E** of Leads, and every Add a row module writes the columns in that order.
 4. The Gmail labels `HOT`, `COLD`, `SUPPORT` and `JUNK` in the demo inbox.
-5. A Gemini API key from Google AI Studio, signed in as the demo account, no billing. Keep it in your password manager. You paste it into Make once, in step 2.3.
+5. A Gemini API key from Google AI Studio, signed in as the demo account, no billing. Keep it in your password manager.
 6. A long random webhook secret (for example 40 random letters and digits). Keep it in your password manager and in your local `.env` as `WEBHOOK_SECRET`. Never commit it.
 
-## Part 2: Connections and keychains
-
-Create these once. Make stores them in your account; nothing secret goes into the repo.
-
-1. **Gmail connection.** You create it the first time you add a Gmail module (step 3.13). Choose the new Gmail app (not "Gmail (legacy)"), click **Create a connection**, name it `Demo Gmail` and sign in with the demo account. The current Gmail app works with a personal Gmail account without your own Google Cloud project.
-2. **Google Sheets connection.** You create it the first time you add a Google Sheets module (step 3.4). Name it `Demo Sheets` and sign in with the demo account. If Google blocks the sign-in, open **Show advanced settings** in the connection dialog and enter the OAuth client ID and secret from the Google Cloud project you made for n8n. Add Make's redirect URI (shown in the Make help for Google Sheets) to that OAuth client first. NOT VERIFIED whether the Free plan needs this.
-3. **Gemini API key keychain.** You create it in the first HTTP module (step 3.8): authentication type **API key**, then **Add** a new keychain named `Gemini API key`, placement **In the header**, parameter name `x-goog-api-key`, value: paste your Gemini key.
-4. **Webhook secret keychain.** You create it in Scenario A's HTTP module (step 5.3): authentication type **API key**, keychain name `Webhook secret`, placement **In the header**, parameter name `X-Webhook-Secret`, value: your webhook secret.
-
-## Part 3: Build Scenario B, "Process lead"
-
-Go to **Scenarios**, click **Create a new scenario**, and rename it `Lead Inbox: Process lead (demo)`.
-
-Optional shortcut: instead of building by hand, open the `...` menu at the bottom of the editor, choose **Import Blueprint** and pick `make/process-lead.blueprint.json`. The draft is NOT VERIFIED (see `make/README.md`), so walk through every step below afterwards and fix what did not import.
+## Part 2: Data structures and connections
 
 ### Data structures (create first)
 
-Open **Data structures** in the left menu and create three. For each, click **Add**, give the name, click **Generator**, choose content type **JSON**, paste the sample and click **Save**.
+Open **Data structures** in the left menu and create the three structures listed in `make/data-structures.json`, with the same names and fields (`spec` lists each field with its type; `collection` and `array` fields hold the nested fields):
 
-1. `Lead input`:
+| Name | Used by |
+|---|---|
+| `Lead Inbox: Gemini request` | Process lead, module 8 "Gemini classify" (HTTP request body) |
+| `Lead Inbox: AI lead` | Process lead, module 9 "Parse AI answer" (Parse JSON) |
+| `Lead Inbox email to webhook body` | Email intake, module 2 "Send to Process lead webhook" (HTTP request body) |
 
-   ```json
-   {"source": "form", "message_id": "demo-001", "from_name": "Ada Example", "from_email": "ada@example.com", "subject": "[DEMO] Example", "body": "Text", "received_at": "2026-11-01T10:00:00.000Z"}
-   ```
+The `demo_id` values are the ids in the demo account. Your ids will differ, so after the import, pick your structure in each of those three modules.
 
-2. `Gemini request`:
+### Connections
 
-   ```json
-   {"systemInstruction": {"parts": [{"text": "x"}]}, "contents": [{"role": "user", "parts": [{"text": "x"}]}], "generationConfig": {"responseMimeType": "application/json", "maxOutputTokens": 512, "temperature": 0.2}}
-   ```
+Make stores these in your account; nothing secret goes into the repo.
 
-3. `AI lead`:
+1. **Google Sheets**: sign in with the demo account.
+2. **Gmail**: sign in with the demo account. Both scenarios use the same Gmail connection.
+3. **Gemini**: an HTTP connection of type **API key**. Value: your Gemini key. Placement: **In the header**. Parameter name: `x-goog-api-key`. With placement "query parameters", Gemini answered `400` in the test.
 
-   ```json
-   {"category": "hot_lead", "confidence": 0.9, "name": "x", "company": "x", "budget": "x", "need": "x", "urgency": "high", "reply_draft": "x", "reason": "x"}
-   ```
+## Part 3: Import the blueprints
 
-### 3.1 Module 1: Webhooks, Custom webhook ("Lead webhook")
+1. **Process lead first.** Create a scenario, open the `...` menu at the bottom of the editor, choose **Import Blueprint** and pick `make/process-lead.blueprint.json`. Make asks you to pick a connection for each Google Sheets, Gmail and HTTP module; choose the ones from Part 2.
+2. Open module 1 ("Lead webhook") and create or pick a webhook. Turn on **Get request headers**: the secret filters read the request headers (NOT VERIFIED whether the import keeps this setting, so check it). Copy the webhook URL. It goes into your local `.env` as `WEBHOOK_URL` and into Email intake. It is not a password, but keep it out of the repo.
+3. Replace the placeholders in Process lead:
+   - `PASTE_WEBHOOK_SECRET_IN_EDITOR`: your webhook secret, in the 3 filters after the "Check request" router (4 conditions in total).
+   - `PASTE_SPREADSHEET_ID`: your Sheet id, in every Google Sheets module (10 Add a row modules and the "Read Leads message ids" URL).
+   - `PASTE_ALERT_EMAIL`: the demo inbox's own address, in "Hot: alert email".
+   - `PASTE_HOT_LABEL_ID`, `PASTE_COLD_LABEL_ID`, `PASTE_SUPPORT_LABEL_ID`, `PASTE_JUNK_LABEL_ID`: in the four label modules, pick the matching label from the list.
+   - Modules 8 and 9: pick the data structures from Part 2.
+4. **Email intake second.** Create another scenario and import `make/email-intake.blueprint.json`. Pick the Gmail connection. In module 2, replace `PASTE_PROCESS_LEAD_WEBHOOK_URL` with the webhook URL from step 2, `PASTE_WEBHOOK_SECRET_IN_EDITOR` in the `X-Webhook-Secret` header with your secret, and pick the third data structure.
+5. Scenario settings (gear icon at the bottom of the editor), in **both** scenarios:
+   - **Process data in order**: **No**. With Yes, one incomplete execution blocks every new webhook run, and the webhook answers a plain `Accepted` instead of the `202` JSON answer.
+   - **Store incomplete executions**: **Yes**. The Retry error handlers need it.
+6. Save both. Keep them **off** until you test (Part 7).
 
-1. Click the big plus, search **Webhooks**, choose **Custom webhook**.
-2. Click **Create a webhook**. Name: `lead-inbox`.
-3. Open **Show advanced settings**: **Data structure** `Lead input`, **Get request headers** Yes, **JSON pass-through** No.
-4. Save. Copy the webhook URL. It goes into your local `.env` as `WEBHOOK_URL` and into Scenario A (step 5.3). It is not secret, but keep it out of the repo.
-5. Click **Run once** in the editor, then send one demo request so Make learns the payload: `node --env-file=.env scripts/send-test-leads.mjs` and stop it with Ctrl+C after the first line, or post one message with any HTTP tool.
-6. Open the output bubble of module 1 and check the header list. Find the secret header and note how its **name** is written (for example `x-webhook-secret`). The filters below assume lower case. If Make shows another case, use that exact text in steps 3.2 and 3.3.
+## Part 4: Process lead, module by module
 
-### 3.2 Router ("Check secret") and module 3: Webhook response 403
+Module numbers are the ids in the blueprint (the number in the bubble on each module).
 
-1. Add **Flow control**, **Router** after module 1. It gets number 2.
-2. First route: add **Webhooks**, **Webhook response**. Status `403`. Body:
+### Check the request
 
-   ```text
-   {"error": "Forbidden"}
-   ```
+1. **Lead webhook** (Custom webhook): receives the JSON body of the web form or of Email intake.
+2. **Check request** (Router), three routes:
+   - **Respond 403** (module 3), filter "Wrong or missing secret": the `x-webhook-secret` header is not equal to the secret. Body `{"error":"forbidden"}`. A missing header is also "not equal", so it is rejected.
+   - **Respond 400** (module 4), filter "Secret ok, empty message": secret ok, and both `subject` and `body` do not exist. Then **Dead Letter: bad input** (module 5) adds a Dead Letter row with stage `normalize` and the key `<message_id>:normalize` (`make-execution:normalize` when there is no message id).
+   - **Normalize** (module 30, Set multiple variables), filter "Secret ok, has content": secret ok, and `subject` or `body` exists. It sets `msgid` (the given `message_id`, else `form-` plus the time in milliseconds), `source` (`form` when empty) and `body` (cut to 4,000 characters).
 
-   Advanced settings, **Custom headers**: `Content-Type` = `application/json`.
-3. Filter on the link from the router to module 3, label `Wrong secret`:
-   - Condition: `{{get(map(1.__IMTHEADERS__; value; name; x-webhook-secret); 1)}}`
-   - Operator: **Text operators: Not equal to**
-   - Value: your webhook secret (typed here in the editor only).
+### Classify
 
-   A missing header gives an empty value, which is also "not equal", so it is rejected.
+3. **Respond 202** (module 6): `{"message_id":"..."}`. The caller gets its answer now; the rest runs after it.
+4. **Read Leads message ids** (module 7, Google Sheets, Make an API call): `GET spreadsheets/<id>/values/Leads!E2:E`, the `message_id` column.
+5. **Gemini classify** (module 8, HTTP, Make a request), filter "Not already in Leads": the message id is not in the list from module 7 (the filter compares `,id,` against the joined column, so a key never matches part of another key). A duplicate stops here. The request:
+   - URL `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent`. This is the only place the model id is set. Check it against the current Flash-Lite id in Google AI Studio.
+   - Authentication: the Gemini API key connection (header `x-goog-api-key`).
+   - Body built from the data structure `Lead Inbox: Gemini request`: the system prompt from `prompts/classify.md`, the user template with the message fields, `responseMimeType` `application/json`, `maxOutputTokens` 512, `temperature` 0.2.
+   - Parse response Yes, non-2xx answers are errors (so a `429` or `503` goes to the Retry handler).
+6. **Parse AI answer** (module 9, Parse JSON) with the data structure `Lead Inbox: AI lead`. If the answer is not valid JSON, its error handler route adds a Dead Letter row (**Dead Letter: bad AI output**, module 90, stage `parse`) and then **Skip** (the `builtin:Ignore` directive).
 
-### 3.3 Module 4: Tools, Set multiple variables ("Config and normalize")
+### Route by category
 
-1. Add a second route from the router: **Tools**, **Set multiple variables**.
-2. Filter on that link, label `Secret OK`: same condition as above, operator **Text operators: Equal to**, value: your webhook secret.
-3. Variable lifetime: **One cycle**. Add these variables (name, then value):
+7. **Route by category** (Router), five routes:
 
-   | Name | Value |
-   |---|---|
-   | `gemini_model` | `gemini-3.1-flash-lite` |
-   | `max_output_tokens` | `512` |
-   | `alert_to` | `demo-inbox@example.com` (change to the demo inbox's own address) |
-   | `spreadsheet_id` | the id from your Sheet's URL (the part between `/d/` and `/edit`) |
-   | `source` | `{{if(1.source = "email"; "email"; "form")}}` |
-   | `message_id` | `{{ifempty(trim(1.message_id); if(1.source = "email"; emptystring; "form-" + timestamp + "-" + substring(uuid; 0; 6)))}}` |
-   | `from_name` | `{{trim(1.from_name)}}` |
-   | `from_email` | `{{lower(trim(1.from_email))}}` |
-   | `subject` | `{{trim(1.subject)}}` |
-   | `body` | `{{substring(trim(1.body); 0; 4000)}}` |
-   | `received_at` | `{{ifempty(trim(1.received_at); formatDate(now; "YYYY-MM-DDTHH:mm:ss.SSSZ"))}}` |
-
-   `gemini_model` is the only place the model id is set. Check it against the current Flash-Lite id in Google AI Studio (the n8n setup notes that `gemini-3.1-flash-lite` is listed with a free tier on the Gemini API pricing page as of 2026-11-01).
-
-### 3.4 Router ("Check input"), module 6 (Webhook response 400) and module 7 (Dead Letter row)
-
-1. Add a **Router** after module 4 (number 5).
-2. First route, module 6: **Webhook response**, status `400`, header `Content-Type` = `application/json`, body:
-
-   ```text
-   {"error": "{{if(length(4.message_id) = 0; "Email message has no message_id"; "Message has no subject and no body")}}"}
-   ```
-
-3. Filter on the link to module 6, label `Invalid input`:
-   - Group 1: `{{4.subject}}` **Basic operators: Does not exist**, AND `{{4.body}}` **Does not exist**
-   - OR group 2: `{{4.message_id}}` **Does not exist**
-4. After module 6, module 34 ("Read Dead Letter keys"): **Google Sheets**, **Make an API call**. Create the `Demo Sheets` connection here. URL `/v4/spreadsheets/{{4.spreadsheet_id}}/values/%27Dead%20Letter%27!H:H` (the tab name in quotes, URL-encoded; NOT VERIFIED whether Make also accepts it unencoded), method `GET`, Retry error handler. See "Write each row once" below.
-5. After module 34, module 7: **Google Sheets**, **Add a row**. Search method: select from the list, pick your spreadsheet, sheet `Dead Letter`, **Table contains headers** Yes. Filter on the link from module 34, label `Not written yet`: `{{flatten(34.body.values)}}` **Array operators: Does not contain** `{{ifempty(4.message_id; "no-id-" + timestamp)}}:normalize`. Map the columns:
-
-   | Column | Value |
-   |---|---|
-   | time | `{{formatDate(now; "YYYY-MM-DDTHH:mm:ss.SSSZ")}}` |
-   | tool | `make` |
-   | source | `{{4.source}}` |
-   | message_id | `{{1.message_id}}` |
-   | stage | `normalize` |
-   | error | same `if(...)` formula as the 400 body |
-   | raw_payload | `from={{1.from_email}} subject={{substring(1.subject; 0; 400)}}` |
-   | dead_letter_key | `{{ifempty(4.message_id; "no-id-" + timestamp)}}:normalize` (the same text as in the filter) |
-
-6. Add the **Retry** error handler to module 7 (see "Retry handler settings" below).
-
-### 3.5 Module 8: Webhook response 202
-
-1. Second route from router 5: **Webhook response**, status `202`, header `Content-Type` = `application/json`, body:
-
-   ```text
-   {"message_id": "{{4.message_id}}"}
-   ```
-
-2. Filter on the link, label `Valid input`:
-   - Group 1: `{{4.subject}}` **Exists** AND `{{4.message_id}}` **Exists**
-   - OR group 2: `{{4.body}}` **Exists** AND `{{4.message_id}}` **Exists**
-
-   The caller gets `202` now. Everything after this runs in the background, like the n8n version.
-
-### 3.6 Module 9: Google Sheets, Make an API call ("Read Leads message ids")
-
-Make's **Search rows** module returns nothing at all when no row matches, which would stop the scenario for every new lead. One API call that reads the whole `message_id` column always returns one bundle, so it works as a duplicate check.
-
-1. Add **Google Sheets**, **Make an API call**. Connection `Demo Sheets`.
-2. URL: `/v4/spreadsheets/{{4.spreadsheet_id}}/values/Leads!E:E`
-3. Method: `GET`. No headers, no query string, no body.
-4. Add the **Retry** error handler.
-
-### 3.7 Module 10: JSON, Create JSON ("Build classify request")
-
-1. Add **JSON**, **Create JSON**. Data structure `Gemini request`.
-2. Filter on the link from module 9, label `Not a duplicate`:
-   - `{{contains(flatten(9.body.values); 4.message_id)}}` **Text operators: Not equal to** `true`
-
-   A duplicate stops here, like "Drop duplicates" in n8n.
-3. Map:
-   - `systemInstruction.parts[1].text`: paste the whole system prompt from `prompts/classify.md` (the text block under "System prompt").
-   - `contents[1].role`: `user`
-   - `contents[1].parts[1].text`: paste the user template from `prompts/classify.md` and replace each placeholder with the module 4 item: `{{source}}` becomes `{{4.source}}`, and the same for `from_name`, `from_email`, `received_at`, `subject` and `body`.
-   - `generationConfig.responseMimeType`: `application/json`
-   - `generationConfig.maxOutputTokens`: `{{4.max_output_tokens}}`
-   - `generationConfig.temperature`: `0.2`
-
-   Create JSON escapes quotes and line breaks in the message for you, which is why it is used instead of typing JSON into the HTTP module.
-
-### 3.8 Module 11: HTTP, Make a request ("Gemini classify")
-
-1. Add **HTTP**, **Make a request**.
-2. Authentication type: **API key**. Keychain: create `Gemini API key` (Part 2, step 3).
-3. URL: `https://generativelanguage.googleapis.com/v1beta/models/{{4.gemini_model}}:generateContent`
-4. Method: `POST`. Body content type: `application/json`. Body: map `{{10.json}}` (the JSON string from module 10; pick the "JSON string" input option if Make offers a choice).
-5. **Parse response**: Yes. Timeout: `30` seconds.
-6. Turn on the option that treats non-2xx answers as errors (in older HTTP modules it is called **Evaluate all states as errors**). This makes a `429` rate limit or a `503` go to the Retry handler.
-7. Add the **Retry** error handler.
-
-### 3.9 Module 12: JSON, Parse JSON ("Parse first answer")
-
-1. Add **JSON**, **Parse JSON**. Data structure `AI lead`.
-2. JSON string:
-
-   ```text
-   {{trim(replace(11.data.candidates[1].content.parts[1].text; /```(?:json)?/gi; emptystring))}}
-   ```
-
-   This removes code fences, like the n8n cleanup. If module 11's output puts the body under another name than `data`, pick the same path from the output panel.
-3. Right-click, **Add error handler**, choose **Resume**. Set the substitute output: `category` empty, `reply_draft` empty. A broken answer then continues as "invalid" and gets its one repair, instead of stopping the scenario.
-
-### 3.10 Router ("Repair if needed"): modules 14, 15, 16 on route 1
-
-The two routes of a router run one after the other, in order. Route 1 runs the repair only when it is needed and stores the result; route 2 always runs and picks the repaired answer if there is one. This is how Make rejoins two paths without duplicating the rest of the scenario.
-
-1. Add a **Router** after module 12 (number 13).
-2. Route 1, module 14: **JSON**, **Create JSON**, data structure `Gemini request`. Filter on the link, label `First answer invalid`:
-   - Group 1: `{{replace(trim(replace(lower(12.category); /[^a-z]+/g; space)); space; "_")}}` **Text operators: Does not match pattern** `^(hot_lead|cold_lead|support|spam)$`
-   - OR group 2: the same category formula **Text operators: Not equal to** `spam`, AND `{{12.reply_draft}}` **Does not exist**
-
-   Map module 14:
-   - `systemInstruction.parts[1].text`: the system prompt from `prompts/repair.md`.
-   - `contents[1].role`: `user`
-   - `contents[1].parts[1].text`: the user template from `prompts/repair.md`, with `{{error}}` replaced by this fixed text:
-
-     ```text
-     The answer must be one valid JSON object. category must be one of hot_lead, cold_lead, support, spam. reply_draft must be a non-empty string unless category is spam.
-     ```
-
-     and `{{raw_output}}` replaced by `{{substring(11.data.candidates[1].content.parts[1].text; 0; 4000)}}`.
-   - `generationConfig`: same three values as module 10.
-3. Module 15: **HTTP**, **Make a request**, exactly like module 11 but body `{{14.json}}`. Same keychain, same Retry error handler.
-4. Module 16: **Tools**, **Set variable**. Name `repaired_text`, lifetime **One cycle**, value:
-
-   ```text
-   {{trim(replace(15.data.candidates[1].content.parts[1].text; /```(?:json)?/gi; emptystring))}}
-   ```
-
-### 3.11 Route 2: modules 17 and 18, and the repair Dead Letter
-
-1. Route 2 of router 13 (no filter), module 17: **Tools**, **Get variable**, name `repaired_text`.
-2. Module 18: **JSON**, **Parse JSON**, data structure `AI lead`. JSON string:
-
-   ```text
-   {{ifempty(17.value; trim(replace(11.data.candidates[1].content.parts[1].text; /```(?:json)?/gi; emptystring)))}}
-   ```
-
-   If there was a repair, this parses the repaired answer; otherwise the first answer again.
-3. Error handler on module 18 (repaired answer is not JSON): right-click, **Add error handler**. First add module 35, a "Read Dead Letter keys" API call exactly like module 34. Then **Google Sheets**, **Add a row** to `Dead Letter` (module 1800 in the draft) with: time (the `formatDate(now; ...)` formula), tool `make`, source `{{4.source}}`, message_id `{{4.message_id}}`, stage `repair parse`, error `Repaired answer is not valid JSON`, raw_payload `{{substring(17.value; 0; 500)}}`, dead_letter_key `{{4.message_id}}:repair parse`. Filter on the link from module 35, label `Not written yet`: `{{flatten(35.body.values)}}` **Array operators: Does not contain** `{{4.message_id}}:repair parse`. Then end the handler route with **Ignore**. Modules inside an error handler route get no Retry handler of their own.
-
-### 3.12 Router ("Final answer valid?"): module 22 (Dead Letter) and module 23 ("Clean lead")
-
-1. Add a **Router** after module 18 (number 21 in the draft; the number does not matter for routers).
-2. Route 1, module 36: a "Read Dead Letter keys" API call exactly like module 34, with the Retry error handler. Filter on the link from the router to module 36, label `Final answer invalid`: the same two groups as `First answer invalid`, with `18.` instead of `12.`.
-
-   Then module 22: **Google Sheets**, **Add a row** to `Dead Letter`: time, tool `make`, source `{{4.source}}`, message_id `{{4.message_id}}`, stage `repair validate`, error `Invalid category or missing reply_draft after one repair`, raw_payload `{{substring(ifempty(17.value; 11.data.candidates[1].content.parts[1].text); 0; 500)}}`, dead_letter_key `{{4.message_id}}:repair validate`. Filter on the link from module 36, label `Not written yet`: `{{flatten(36.body.values)}}` **Array operators: Does not contain** `{{4.message_id}}:repair validate`. Retry error handler.
-3. Route 2, module 23: **Tools**, **Set multiple variables**, lifetime **One cycle**. Filter label `Final answer valid`:
-   - Group 1: category formula (with `18.`) **Matches pattern** `^(hot_lead|cold_lead|support|spam)$` AND category formula **Equal to** `spam`
-   - OR group 2: category formula **Matches pattern** `^(hot_lead|cold_lead|support|spam)$` AND `{{18.reply_draft}}` **Exists**
-
-   Variables:
-
-   | Name | Value |
-   |---|---|
-   | `category` | `{{replace(trim(replace(lower(18.category); /[^a-z]+/g; space)); space; "_")}}` |
-   | `confidence` | `{{min(1; max(0; ifempty(18.confidence; 0)))}}` |
-   | `name` | `{{trim(18.name)}}` |
-   | `company` | `{{trim(18.company)}}` |
-   | `budget` | `{{trim(18.budget)}}` |
-   | `need` | `{{trim(18.need)}}` |
-   | `urgency` | `{{if(contains(split("high,normal,low"; ","); lower(trim(18.urgency))); lower(trim(18.urgency)); "normal")}}` |
-   | `reply_draft` | `{{if(replace(trim(replace(lower(18.category); /[^a-z]+/g; space)); space; "_") = "spam"; emptystring; trim(18.reply_draft))}}` |
-   | `reason` | `{{ifempty(trim(18.reason); "No reason given")}}` |
-
-### 3.13 Router ("Route by category"): modules 25 to 33
-
-Add a **Router** after module 23 (number 24) with **seven routes**, in this order (routes run top to bottom):
-
-1. **Not spam: draft and Leads row.** Filter `Not spam`: `{{23.category}}` **Not equal to** `spam`.
-   - Module 25: **Gmail**, **Create a draft email**. Create the `Demo Gmail` connection here. To: `{{4.from_email}}`. Subject: `Re: {{4.subject}}`. Content type: plain text. Content: `{{23.reply_draft}}`. Retry error handler. The draft is never sent.
-   - Module 26: **Google Sheets**, **Add a row** to `Leads` (Retry error handler):
-
-     | Column | Value |
-     |---|---|
-     | received_at | `{{4.received_at}}` |
-     | processed_at | `{{formatDate(now; "YYYY-MM-DDTHH:mm:ss.SSSZ")}}` |
-     | tool | `make` |
-     | source | `{{4.source}}` |
-     | message_id | `{{4.message_id}}` |
-     | from_name | `{{4.from_name}}` |
-     | from_email | `{{4.from_email}}` |
-     | subject | `{{4.subject}}` |
-     | category | `{{23.category}}` |
-     | confidence | `{{23.confidence}}` |
-     | name | `{{23.name}}` |
-     | company | `{{23.company}}` |
-     | budget | `{{23.budget}}` |
-     | need | `{{23.need}}` |
-     | urgency | `{{23.urgency}}` |
-     | reason | `{{23.reason}}` |
-     | draft_id | `{{25.id}}` (the draft id from module 25's output) |
-
-2. **Hot lead alert.** Filter `Hot lead`: `{{23.category}}` **Equal to** `hot_lead`.
-   - Module 27: **Gmail**, **Send an email**. To: `{{4.alert_to}}` only. Subject: `[DEMO ALERT] Hot lead: {{4.subject}}`. Plain text content:
-
-     ```text
-     Hot lead from {{ifempty(4.from_name; "unknown")}} <{{ifempty(4.from_email; "no address")}}>
-     Company: {{ifempty(23.company; "-")}}
-     Budget: {{ifempty(23.budget; "-")}}
-     Need: {{ifempty(23.need; "-")}}
-     Urgency: {{23.urgency}}
-     Reason: {{23.reason}}
-
-     A reply draft is waiting in Gmail Drafts. Nothing was sent to the sender.
-     ```
-
-     Retry error handler. This is the only email the scenario sends, and it goes to the demo inbox.
-3. to 6. **Labels, one route per label.** Each route has one **Gmail**, **Update email labels** module (modules 28 to 31): message id `{{4.message_id}}`, labels to add: pick the label from the list. Retry error handler. Filters (both conditions with AND):
-
-   | Route | Filter label | Conditions | Label |
-   |---|---|---|---|
-   | 3 | `Email and hot_lead` | `{{4.source}}` Equal to `email`, `{{23.category}}` Equal to `hot_lead` | HOT |
-   | 4 | `Email and cold_lead` | ... `cold_lead` | COLD |
-   | 5 | `Email and support` | ... `support` | SUPPORT |
-   | 6 | `Email and spam` | ... `spam` | JUNK |
-
-   Web form messages have no Gmail message, so they skip all four.
-7. **Run Log.** No filter on the route. Module 33 ("Read Run Log message ids"): **Google Sheets**, **Make an API call**, URL `/v4/spreadsheets/{{4.spreadsheet_id}}/values/%27Run%20Log%27!D:D`, method `GET`, Retry error handler. Then module 32: **Google Sheets**, **Add a row** to `Run Log` (Retry error handler), with a filter on the link from module 33, label `Not logged yet`: `{{flatten(33.body.values)}}` **Array operators: Does not contain** `{{4.message_id}}`. Map: time (the `formatDate(now; ...)` formula), tool `make`, source `{{4.source}}`, message_id `{{4.message_id}}`, category `{{23.category}}`, note `{{23.reason}}`, outcome:
-
-   ```text
-   {{switch(23.category; "hot_lead"; "Leads row, draft, HOT label, alert"; "cold_lead"; "Leads row, draft, COLD label"; "support"; "Leads row, draft, SUPPORT label"; "JUNK label only")}}
-   ```
-
-Spam therefore gets only the JUNK label (email only) and a Run Log row, with no draft and no Leads row, like the n8n version.
-
-### Write each row once
-
-A Google Sheets **Add a row** is not idempotent: if it runs twice for the same message, the tab gets two rows. The n8n version uses the Sheets node's Append or Update Row operation for this. Make has no single append-or-update module for Google Sheets (NOT VERIFIED, none found in the module list), so Scenario B does "search, then add only if missing":
-
-| Tab | Read before the write | Key |
+| Route | Filter | Modules, in order |
 |---|---|---|
-| Leads | module 9 (the duplicate check at the start) | `message_id` |
-| Run Log | module 33 | `message_id` |
-| Dead Letter | modules 34, 35, 36 | `dead_letter_key` = message id + `:` + stage |
+| Hot | category = `hot_lead` | reply draft, Leads row, alert email to `PASTE_ALERT_EMAIL`, Run Log row, HOT label |
+| Cold | category = `cold_lead` | reply draft, Leads row, Run Log row, COLD label |
+| Support | category = `support` | reply draft, Leads row, Run Log row, SUPPORT label |
+| Spam | category = `spam` | Run Log row, JUNK label |
+| Unknown | category is none of the four | Dead Letter row, stage `validate` |
 
-This keeps a second run for the same message (a re-sent spam message, a replayed request, a run started again from Incomplete executions) from adding a second row. The first row wins; unlike n8n, it is not updated. The array filter needs the whole cell to match, so a key never matches part of another key (NOT VERIFIED in Make).
+- Reply drafts (Gmail, Create a draft) go to the sender with the subject `Re: <subject>`. They are never sent.
+- The alert (Gmail, Send an email) is the only email the scenario sends, and it goes to the demo inbox.
+- Each label module has the filter "Email only" (`source` = `email`): a web form message has no Gmail message, so it gets no label.
+- The Leads row stores the draft id from the draft module.
 
-Limit: Make's Retry handler repeats the failed module, not the read before it (NOT VERIFIED in detail). So if an **Add a row** call writes the row and still reports an error (for example a timeout after Google saved it), its retry can add a second row. NOT VERIFIED whether Make's Add a row can fail that way; it should send one request per row, so a `429` would mean nothing was written. Check the tabs after a run with errors.
+### Retry handlers and Google Sheets settings
 
-### Retry handler settings
-
-Use these on every Gemini, Google Sheets and Gmail module listed above (modules 7, 9, 11, 15, 22, 25 to 34 and 36; module 35 sits inside an error handler route and gets none):
-
-1. Right-click the module, **Add error handler**, **Retry**.
-2. **Automatically complete execution**: Yes. Number of attempts: `3`. Interval: `5` minutes. (A Make community thread reports that very short intervals are scheduled later than set; NOT VERIFIED.)
-3. Retry needs **Allow storing of incomplete executions** in the scenario settings (next section). Without it, Make will not let you save the handler.
-
-### Scenario settings
-
-Click the gear icon (**Scenario settings**) at the bottom of the editor:
-
-1. **Allow storing of incomplete executions**: Yes (needed by Retry).
-2. **Sequential processing**: Yes. Webhook requests are then processed one at a time, which keeps Gemini calls spaced out for the free tier rate limit.
-3. Save the scenario. Set scheduling to **Immediately** (the default for webhook scenarios) and turn the scenario **on**.
+- Every Google Sheets, Gmail and Gemini module has a **Retry** error handler (`builtin:Break`): 3 attempts, 1 minute apart. The only exception is the Add a row inside the "bad AI output" error handler route, which has none.
+- Every Add a row module has **Value input option** `RAW`, so text from a sender or from the AI is stored as text and never run as a formula. The module needs this value set.
 
 ### What happens to failures
 
 | Failure | Where it ends up |
 |---|---|
-| Wrong or missing secret | `403` response, nothing stored |
-| No subject and no body | `400` response and a Dead Letter row (stage `normalize`) |
-| First AI answer not JSON or invalid | One repair call |
-| Repaired answer not JSON | Dead Letter row (stage `repair parse`) |
-| Repaired answer still invalid | Dead Letter row (stage `repair validate`) |
-| Gemini, Sheets or Gmail error (rate limit, outage) | Retried 3 times; if the last try also fails, the run stays in **Incomplete executions** |
+| Wrong or missing secret | `403` answer, nothing stored |
+| No subject and no body | `400` answer and a Dead Letter row (stage `normalize`) |
+| Invalid JSON in the request | `400` answer from Make |
+| AI answer not valid JSON | Dead Letter row (stage `parse`) |
+| AI answer with an unknown category | Dead Letter row (stage `validate`) |
+| Gemini, Sheets or Gmail error (rate limit, outage, timeout) | Retried 3 times, 1 minute apart; if the last try also fails, the run stays in the scenario's **Incomplete executions** list |
 
-Difference from n8n: n8n writes a Dead Letter row when a Gemini call still fails after its retries. Make's Retry handler has no step that runs after the last failed attempt (not found in Make's Retry help page; NOT VERIFIED that none exists), so those runs stay in the scenario's **Incomplete executions** tab instead. After a test or a demo, open that tab: retry each item there, or copy it into the Dead Letter tab by hand.
+## Part 5: Email intake, module by module
 
-## Part 4: Test Scenario B
-
-1. Fill your local `.env` (git-ignored): `WEBHOOK_URL` = the module 1 webhook URL, `WEBHOOK_SECRET` = your secret.
-2. Run `node --env-file=.env scripts/send-test-leads.mjs`. It sends the 12 demo messages and four bad cases, six seconds apart (change it with `--delay-ms`, see "Google Sheets quota" in the main README).
-3. Expected: valid messages get `202`, the message without subject and body gets `400`, a wrong secret gets `403`. The invalid JSON case should be rejected by Make before the scenario runs; the exact status code Make returns is NOT VERIFIED (n8n returns `422`). The script only checks accepted versus rejected.
-4. Check the Leads, Dead Letter and Run Log tabs, Gmail Drafts and the alert emails.
-
-## Part 5: Build Scenario A, "Email intake"
-
-Create a new scenario, rename it `Lead Inbox: Email intake (demo)`. Optional: **Import Blueprint** with `make/email-intake.blueprint.json` (NOT VERIFIED draft), then check each step.
-
-### 5.1 Module 1: Gmail, Watch emails
-
-1. Add **Gmail**, **Watch emails**, connection `Demo Gmail`.
-2. Folder: `INBOX`. Filter type: Gmail search query, if offered, with:
+1. **Watch demo inbox** (Gmail, Watch emails): filter type Gmail search, format full, mark as read No, at most 5 emails per run. Search:
 
    ```text
-   -from:me -label:HOT -label:COLD -label:SUPPORT -label:JUNK
+   in:inbox -from:me -from:make.com -from:google.com -label:HOT -label:COLD -label:SUPPORT -label:JUNK
    ```
 
-   This is the same search as the n8n Gmail Trigger: it skips the alerts the demo inbox sends itself and mail that already has a label. If the module has no search query field (NOT VERIFIED for the current Gmail app), leave the criteria at "all emails" and add a filter on the link to module 2: sender email address **Not equal to** the demo inbox address.
-3. Mark as read: No. Maximum number of results: `5`.
-4. When Make asks where to start, choose **From now on**.
+   It skips the alerts the demo inbox sends itself, Make's own notification emails, Google's welcome emails and mail that already has a label. The first test without the `make.com` and `google.com` exclusions classified those emails too.
+2. **Send to Process lead webhook** (HTTP, Make a request): `POST` to the Process lead webhook URL with the `X-Webhook-Secret` header. Body from the data structure `Lead Inbox email to webhook body`: `source` `email`, the Gmail message id, sender name and address, subject, full text body and the received time in UTC. Retry handler: 3 attempts, 1 minute apart.
 
-### 5.2 Module 2: JSON, Create JSON ("Build lead payload")
+Process lead uses the Gmail message id to add the label, so labels work only for messages that came through Email intake.
 
-Data structure `Lead input`. Map (pick each item from module 1's output panel; the item names below are NOT VERIFIED for the current Gmail app):
+## Part 6: Test results (2026-11-02)
 
-| Field | Value |
-|---|---|
-| source | `email` |
-| message_id | the Gmail **message id** (the API id, not the `Message-ID` header), for example `{{1.id}}` |
-| from_name | the sender's name, for example `{{1.from.name}}` |
-| from_email | the sender's address, for example `{{1.from.address}}` |
-| subject | `{{1.subject}}` |
-| body | `{{substring(1.text; 0; 4000)}}` (the plain text body) |
-| received_at | `{{formatDate(1.date; "YYYY-MM-DDTHH:mm:ss.SSSZ")}}` |
+Web form path, `scripts/send-test-leads.mjs` with `WEBHOOK_URL` pointing at the Process lead webhook:
 
-### 5.3 Module 3: HTTP, Make a request ("Send to Process lead")
+- 16 of 16 HTTP results as expected. Make answers invalid JSON with `400` (n8n answers `422`); the script counts both as rejected.
+- 12 of 12 demo messages classified as expected.
+- `demo-001` sent twice gave one Leads row (the duplicate check works).
+- The message without subject and body gave one Dead Letter row.
+- The Gemini free tier answered `503` "high demand" or timed out after 40 seconds on some calls. The Retry handler recovered all of them.
 
-1. URL: Scenario B's webhook URL (from step 3.1).
-2. Method `POST`, body content type `application/json`, body `{{2.json}}`.
-3. Authentication type **API key**, keychain `Webhook secret` (Part 2, step 4), so the `X-Webhook-Secret` header is added from the keychain and never typed into the scenario.
-4. Parse response: Yes. Treat non-2xx answers as errors: Yes. Retry error handler (same settings as above).
+Email path: four `[DEMO]` emails (hot, cold, support, spam) were all classified correctly, with the drafts, the labels and the hot lead alert.
 
-### 5.4 Settings and schedule
+To run the web form test yourself: fill your local `.env` (git-ignored) with `WEBHOOK_URL` and `WEBHOOK_SECRET`, turn Process lead on, run `node --env-file=.env scripts/send-test-leads.mjs`, then check the three tabs, Gmail Drafts and the alert, and turn the scenario off again.
 
-1. Scenario settings: **Allow storing of incomplete executions** Yes, **Sequential processing** Yes.
-2. Schedule: every 15 minutes at most (the Free minimum, NOT VERIFIED).
-3. Keep the scenario **off**. For a test or a demo, either click **Run once** right after sending a test email, or turn it on for the length of the demo and off again afterwards.
+## Part 7: Credits, keep the scenarios off
 
-## Part 6: Credit estimate
+- Each processed lead used about 8 to 10 operations (Make execution logs).
+- Email intake polls at the 15-minute minimum and uses a credit on every poll, even when there is no new mail: about 2,900 a month, which is more than the 1,000 free credits on its own.
+- So both scenarios stay **off** and are switched on only for a test or a demo. For an email test, you can also send the email and click **Run once** in Email intake instead of switching it on.
+- One full run of the test script (16 requests, 12 of them classified) uses roughly 100 to 120 operations for the 12 classified messages, plus the bad cases and the Retry attempts. This is an estimate from the per-lead number, NOT VERIFIED as a total.
 
-All numbers below are an **estimate, NOT VERIFIED**. They assume Make charges 1 credit per module run (including the webhook trigger and each Webhook response), 0 credits for routers, filters and error handler directives, and 1 credit for each Scenario A check even when no email is found. Check the real numbers in the scenario's run history after the first test.
+## Part 8: Differences from the n8n version
 
-| Case | Scenario B | Scenario A | Total |
-|---|---|---|---|
-| Web form, hot lead, first answer valid | 15 | 0 | 15 |
-| Web form, cold lead or support | 14 | 0 | 14 |
-| Web form, spam | 12 | 0 | 12 |
-| Email, hot lead | 16 | 3 | 19 |
-| Email, spam | 13 | 3 | 16 |
-| Extra when a repair is needed | +3 | 0 | +3 |
-| Wrong secret | 2 | 0 | 2 |
-| No subject and no body | 5 | 0 | 5 |
-| Duplicate message | 4 | 0 | 4 |
-
-How Scenario B's 15 for a web form hot lead adds up: webhook 1, set variables 1, response 202 1, read message ids 1, create JSON 1, Gemini 1, parse 1, get variable 1, parse final 1, clean lead 1, draft 1, Leads row 1, alert 1, read Run Log ids 1, Run Log row 1.
-
-What that means on 1,000 credits a month:
-
-- One full run of `scripts/send-test-leads.mjs` (16 requests): about 170 to 210 credits.
-- Scenario A left on at a 15-minute interval: 4 checks an hour, about 2,900 checks a month, which alone is more than the 1,000 credits. That is why it stays off outside tests and demos.
-
-## Part 7: Where Make's cleanup is weaker than the n8n Code node
-
-The n8n version runs `cleanAiOutput` from `src/cleanup.js`, with unit tests. Make's Free plan has no shared JavaScript, so Scenario B rebuilds the same rules with built-in functions and filters. Same rules, but weaker in these places:
-
-| Rule | n8n (`src/cleanup.js`) | Make (Scenario B) |
+| Topic | n8n | Make |
 |---|---|---|
-| Code fences | Removed | Removed (`replace` with a regex) |
-| Text before or after the JSON | Cut away (first `{` to last `}`) | Not cut away: the answer fails to parse and goes to the repair call. JSON output mode makes this rare. |
-| Category spelling | `Hot Lead`, `hot-lead`, `HOT`, `lead (hot)` all become `hot_lead` | `Hot Lead` and `hot-lead` become `hot_lead`; `HOT` or `lead (hot)` do not and go to the repair call |
-| Confidence | Any number-like value, clamped to 0..1, else 0 | Clamped to 0..1, empty becomes 0; a non-numeric string is not handled (NOT VERIFIED what `min`/`max` do with text) |
-| Empty or whitespace-only reply draft | Rejected | Empty rejected; whitespace only passes the filter (then trimmed to empty) |
-| Error sent to the repair call | The exact validation error | One fixed text listing all the rules |
-| Tests | `node:test` unit tests run on every commit | None inside Make; checked by running the demo set |
-| Input normalizing | `normalizeInput`, unit tested | Formulas in module 4, same rules, not unit tested |
+| AI output cleanup | `src/cleanup.js` strips code fences, fixes small mistakes (for example `Hot Lead` to `hot_lead`) and validates | None: the answer is parsed as is (JSON output mode makes fences rare) and the category must match exactly |
+| Invalid AI output | One repair call to Gemini, then Dead Letter | No repair call: straight to Dead Letter (stage `parse` or `validate`) |
+| Sheets writes | Append or update on a key column, so a retry never adds a second row | Add a row only. The duplicate check covers Leads only. Run Log and Dead Letter rows are add-only, so a retry after a write that already succeeded could add a duplicate row |
+| Messages sent again | Leads, Run Log and Dead Letter are keyed, so a repeat changes nothing | A repeat of a message that has a Leads row stops at the duplicate check. A repeat of a spam message or a message that went to Dead Letter is processed again and adds another row |
+| Call that still fails after retries | Dead Letter row | Stays in **Incomplete executions**, which acts as Make's dead-letter queue. After a test, open that list and retry or delete each item |
+| Retry timing | 3 tries, 5 seconds apart | 3 attempts, 1 minute apart |
+| Invalid JSON request | `422` | `400` |
+| Webhook secret | Header Auth credential | Compared in scenario filters; the value is part of the scenario in the Make account |
+| Email polling | Every minute | Every 15 minutes at most, off outside demos |
 
-## Part 8: Export the working blueprints
+## Part 9: Export after a change
 
-When both scenarios work:
-
-1. In each scenario, open the `...` menu, **Export Blueprint**.
-2. Save the files over `make/process-lead.blueprint.json` and `make/email-intake.blueprint.json`.
-3. Follow "Before committing an exported blueprint" in `make/README.md` (remove the secret, ids and URL), then run `npm test` before committing.
+1. In the scenario, open the `...` menu and choose **Export Blueprint**.
+2. Pretty-print the file with 2-space indentation and save it over the file in `make/`.
+3. Follow "Before committing a new export" in `make/README.md` (put the placeholders back), then run `npm test` before committing.
